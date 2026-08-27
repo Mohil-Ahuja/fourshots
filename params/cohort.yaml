@@ -113,14 +113,17 @@ balance:
 # --- Rail conditions -------------------------------------------------------
 
 issuer_downtime:
-  daily_probability: 0.008
   mean_duration_hours: 6.0
-  provenance: partially_documented
+  provenance: assumed
   rationale: >
-    NPCI reports system-wide UPI technical decline around 0.7 to 0.8 percent
-    against a target below 1 percent. We use 0.008 as a per-issuer daily outage
-    probability, which is a different quantity from a per-transaction decline
-    rate -- a deliberate reinterpretation, not a citation. Duration is assumed.
+    How long an issuer outage lasts, drawn per mandate around this mean. How
+    OFTEN outages occur is not set here: the share of failures caused by issuer
+    downtime is already declared in decline_mix, and stating it twice let the
+    two disagree. An earlier version carried a daily_probability of 0.008, and
+    the outage schedule it drove was so sparse that issuer-down mandates
+    cleared on their first attempt -- the mode was inert and 11.8% of the
+    declared cohort never exercised it. Removed rather than left as a knob
+    that governs nothing.
 
 # --- Mandate population ----------------------------------------------------
 

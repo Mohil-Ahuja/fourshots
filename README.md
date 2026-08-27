@@ -58,14 +58,40 @@ attempt *N+1*.
 
 | | Razorpay documented default | fourshots | delta |
 |---|---|---|---|
-| recovery rate | 45.6% | **66.3%** | +45.5% |
-| recovered | ₹56,17,846 | **₹83,96,636** | +49.5% |
-| mandates saved | 912 | **1,598** | +75.2% |
-| attempts spent | 5,508 | **3,887** | −29.4% |
-| attempts per recovery | 6.04 | **2.93** | −51.5% |
+| recovery rate | 44.0% | **62.9%** | +42.8% |
+| recovered | ₹49,72,579 | **₹75,28,138** | +51.4% |
+| mandates saved | 881 | **1,600** | +81.6% |
+| attempts spent | 5,842 | **4,058** | −30.5% |
+| attempts per recovery | 6.63 | **3.23** | −51.4% |
 
-**More money and more mandates from 30% fewer attempts.** Not a trade-off.
-Attempts spent on debits that could never clear fall from 1,540 to 477.
+**More money and more mandates from 30% fewer attempts**, on the same
+regulator-capped budget. Attempts spent on debits that could never clear fall
+from 1,508 to 453.
+
+### Where it is worse
+
+The headline is a net figure, and net figures hide things. Two costs are real,
+and `python -m fourshots.benchmark` prints them on every run so the trade-off
+travels with the result:
+
+**Cash-flow lag.** The engine deliberately waits — for money to arrive, for an
+outage to clear — so recoveries land later.
+
+| days from due date to recovery | median | mean | p90 | max |
+|---|---|---|---|---|
+| baseline | 0.0 | 0.6 | 1.0 | 3.0 |
+| fourshots | 1.0 | **6.0** | **16.0** | **25.0** |
+
+A merchant feels that as delayed cash even when the total is higher. Whether
++51% recovered is worth a six-day mean delay is the merchant's call, not ours
+— but it should be made with the number in view.
+
+**Mandate-level regressions.** Aggregate improvement is compatible with
+individual losses. **76 mandates worth ₹2,26,020 were recovered by the baseline
+and not by the engine** — mostly customer-absent declines, where the engine
+escalates to a person while the baseline retries blindly and sometimes gets
+lucky. Against ₹27,81,579 gained on 453 mandates, a 12.3x ratio. Worth taking,
+and still a real loss.
 
 Reproduce with `python -m fourshots.benchmark` (see below). The seed is fixed,
 so these exact numbers should appear on your machine.
@@ -107,17 +133,26 @@ Both are in the git history, and both matter more than the headline.
 **The sensitivity sweep killed our first engine.** It held a prior about Indian
 payroll and aimed each balance retry at the next plausible payday. It scored
 +41%. Then shifting the *world's* payday distribution three days while the
-prior stayed fixed degraded the advantage to **+11.3%** — the engine was being
+prior stayed fixed degraded the advantage to **+8.7%** — the engine was being
 told the answer more than reading the world. Spreading attempts evenly across
-the cycle needs no payday belief at all and holds at **+44.4% worst case**. The
+the cycle needs no payday belief at all and holds at **+46.5% worst case**. The
 offsets are even thirds of a ~30-day cycle, derived from the cycle length
 rather than fitted to the cohort.
 
 **A third of the taxonomy was dead code.** `classify()` accepted an NPCI
 response code with documented mappings for Z9, Z8, U28, U30 and U69. Nothing
 ever passed one. That mattered: Z8 states a breached limit, which is terminal,
-and the engine could not act on it because it never saw it. Wiring the path
-through moved recovery from 63.5% to 66.3%.
+and the engine could not act on it because it never saw it.
+
+**Two failure modes were inert, and a probe found them.** Instrumenting which
+decline classes actually reached the engine showed `customer_absent` and
+`issuer_down` — 17% of the declared cohort — never arrived at all. The first
+was silently reclassified because the simulator tagged it with NPCI code U69
+while the taxonomy read U69 as rail-transient. The second cleared on its first
+attempt unless a random 0.8%-per-day outage happened to land on that exact
+day, so the mode was effectively decorative. Both are fixed; U69 now yields to
+a definite aggregator code, because its own documentation spans two situations
+needing opposite responses.
 
 ## Live integration
 
@@ -142,7 +177,7 @@ would never have produced that code.
 ```bash
 pip install -e ".[dev]"
 
-pytest -q                          # 179 tests
+pytest -q                          # 192 tests
 python tools/mutation_audit.py     # 12/12 mutations caught
 python -m fourshots.benchmark      # reproduce the headline table
 ```

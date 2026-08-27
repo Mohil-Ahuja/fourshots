@@ -173,11 +173,12 @@ def run_cycle(
 ) -> CycleResult:
     """Run one mandate through one execution cycle under `retry_policy`."""
     now = _first_debit_at(mandate, month)
+    cycle_start = now
     history: list[DeclineRecord] = []
     attempts_used = 0
 
     while attempts_used < MAX_ATTEMPTS_PER_CYCLE:
-        result = world.attempt(mandate, now)
+        result = world.attempt(mandate, now, cycle_start)
         attempts_used += 1
         history.append(DeclineRecord(now, result.razorpay_code, result.npci_code))
 

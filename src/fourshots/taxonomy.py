@@ -353,9 +353,17 @@ _NPCI_UPI: dict[str, Mapping_] = {
         "account and bank risk flags. Too coarse to act on confidently.",
     ),
     "U69": Mapping_(
-        PSP_TRANSIENT,
+        # NPCI's own description spans two situations needing opposite
+        # responses: the collect request expired because the customer took too
+        # long (a person must act), and the payer or payee PSP was temporarily
+        # unavailable (nothing must act, just wait). Guessing either way costs
+        # an attempt when wrong, so it is treated as a catch-all and yields to
+        # a definite Razorpay code -- the same rule already applied to U30.
+        UNCLASSIFIED,
         Confidence.DOCUMENTED,
-        "Payer or payee PSP temporarily unavailable.",
+        "Collect request expired OR payer/payee PSP temporarily unavailable. "
+        "Spans customer-absent and rail-transient, which need opposite "
+        "responses, so it is too coarse to act on alone.",
     ),
 }
 

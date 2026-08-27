@@ -123,6 +123,7 @@ class Mandate:
     daily_burn: float           # fraction of opening balance spent per day
     true_mode: FailureMode
     code_is_unmappable: bool    # rail emits a code the taxonomy cannot read
+    outage_hours: float = 6.0   # for ISSUER_DOWN: how long the outage lasts
 
     def balance_on(self, when: date) -> Decimal:
         """Ground-truth account balance, as a multiple of the debit amount.
@@ -197,28 +198,15 @@ class World:
     def __init__(self, params: Params, rng: random.Random) -> None:
         self._params = params
         self._rng = rng
-        self._downtime: dict[date, tuple[datetime, datetime]] = {}
-        self._downtime_prob = float(params.raw["issuer_downtime"]["daily_probability"])
-        self._downtime_hours = float(
-            params.raw["issuer_downtime"]["mean_duration_hours"]
-        )
 
-    def _outage_on(self, day: date) -> tuple[datetime, datetime] | None:
-        """Whether the issuer is down on `day`, memoised so it stays consistent
-        across repeated queries within a run."""
-        if day not in self._downtime:
-            if self._rng.random() < self._downtime_prob:
-                start_hour = self._rng.uniform(0, 24 - self._downtime_hours)
-                start = datetime.combine(day, datetime.min.time(), tzinfo=IST) + timedelta(
-                    hours=start_hour
-                )
-                self._downtime[day] = (start, start + timedelta(hours=self._downtime_hours))
-            else:
-                self._downtime[day] = None  # type: ignore[assignment]
-        return self._downtime[day]
-
-    def attempt(self, mandate: Mandate, at: datetime) -> AttemptResult:
+    def attempt(
+        self, mandate: Mandate, at: datetime, cycle_start: datetime | None = None
+    ) -> AttemptResult:
         """Resolve one debit attempt against ground truth.
+
+        `cycle_start` is the original scheduled debit, needed to know how long
+        an outage has been running. It is harness state, not policy state --
+        the policy never sees it.
 
         Returns only what the rail would tell a merchant.
         """
@@ -227,7 +215,7 @@ class World:
         if mode is FailureMode.NONE:
             return AttemptResult(True, at, None, None)
 
-        cleared = self._would_clear(mandate, at, mode)
+        cleared = self._would_clear(mandate, at, mode, cycle_start)
         if cleared:
             return AttemptResult(True, at, None, None)
 
@@ -237,7 +225,13 @@ class World:
 
         return AttemptResult(False, at, _MODE_TO_CODE[mode], _MODE_TO_NPCI.get(mode))
 
-    def _would_clear(self, mandate: Mandate, at: datetime, mode: FailureMode) -> bool:
+    def _would_clear(
+        self,
+        mandate: Mandate,
+        at: datetime,
+        mode: FailureMode,
+        cycle_start: datetime | None = None,
+    ) -> bool:
         """Whether the blocker behind `mode` has resolved by `at`."""
         if mode in TERMINAL_MODES:
             return False
@@ -246,8 +240,17 @@ class World:
             return mandate.balance_on(at.date()) >= mandate.amount
 
         if mode is FailureMode.ISSUER_DOWN:
-            outage = self._outage_on(at.date())
-            return not (outage and outage[0] <= at < outage[1])
+            # The outage begins at the scheduled debit and lasts `outage_hours`.
+            #
+            # Previously this consulted a random daily outage schedule, which
+            # meant an issuer-down mandate cleared on its first attempt unless
+            # an outage happened to fall on that exact day -- roughly a 0.8%
+            # chance. The mode was effectively inert, and 11.8% of the cohort
+            # never exercised it. Tying the outage to the debit is what makes
+            # the declared mix real.
+            if cycle_start is None:
+                return True
+            return at >= cycle_start + timedelta(hours=mandate.outage_hours)
 
         if mode is FailureMode.PSP_TRANSIENT:
             # Rail congestion clears quickly; any attempt in a later window
@@ -321,6 +324,12 @@ def build_cohort(params: Params, rng: random.Random) -> list[Mandate]:
             ),
         )
 
+        # Outage duration for issuer-down mandates, drawn around the declared
+        # mean so some clear on the next window and some outlast the cycle.
+        outage_hours = max(
+            0.5, rng.gauss(float(params.raw["issuer_downtime"]["mean_duration_hours"]), 3.0)
+        )
+
         cohort.append(
             Mandate(
                 id=f"mand_{index:05d}",
@@ -332,6 +341,7 @@ def build_cohort(params: Params, rng: random.Random) -> list[Mandate]:
                 daily_burn=burn,
                 true_mode=FailureMode(mode_name),
                 code_is_unmappable=unmappable,
+                outage_hours=outage_hours,
             )
         )
 

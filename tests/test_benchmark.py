@@ -73,3 +73,73 @@ def test_engine_advantage_survives_every_payday_shift(params) -> None:
         assert engine.recovered_value > baseline.recovered_value, (
             f"engine failed to beat the baseline at payday shift {shift:+d}"
         )
+
+
+# --- Reporting output ------------------------------------------------------
+#
+# The benchmark's output is quoted in the README and reproduced by CI, so the
+# printing path is part of the deliverable rather than incidental.
+
+def test_headline_prints_every_metric_the_readme_quotes(params, capsys) -> None:
+    from fourshots.benchmark import print_headline
+
+    print_headline(params)
+    out = capsys.readouterr().out
+
+    for label in (
+        "recovery rate",
+        "recovered (INR)",
+        "mandates saved",
+        "attempts spent",
+        "attempts per recovery",
+        "attempts on hopeless debits",
+    ):
+        assert label in out, f"headline output is missing {label!r}"
+
+    assert "BASELINE" in out and "FOURSHOTS" in out
+    # The cohort must be identified, or the numbers cannot be reproduced.
+    assert str(params.seed) in out
+
+
+def test_headline_declares_parameter_provenance(params, capsys) -> None:
+    """A results table that does not say how much of its world is assumed is
+    hiding the thing a reader most needs to weigh it."""
+    from fourshots.benchmark import print_headline
+
+    print_headline(params)
+    out = capsys.readouterr().out
+    assert "provenance" in out.lower()
+    assert "assumed" in out.lower()
+
+
+def test_headline_returns_both_arms(params, capsys) -> None:
+    from fourshots.benchmark import print_headline
+
+    baseline, engine = print_headline(params)
+    capsys.readouterr()
+    assert baseline.policy_name == "razorpay_documented_default"
+    assert engine.policy_name == "constraint_aware_engine"
+    assert engine.recovered_value > baseline.recovered_value
+
+
+def test_sweep_prints_every_shift_and_a_worst_case(params, capsys) -> None:
+    from fourshots.benchmark import print_sweep
+
+    print_sweep(params)
+    out = capsys.readouterr().out
+
+    for shift in range(-3, 4):
+        assert f"{shift:+d}" in out, f"sweep output is missing shift {shift:+d}"
+    assert "worst case" in out.lower()
+
+
+def test_cli_entrypoint_runs(params, capsys, monkeypatch) -> None:
+    """CI runs this exact command; if it cannot execute, the README is lying."""
+    import sys
+
+    from fourshots.benchmark import main
+
+    monkeypatch.setattr(sys, "argv", ["benchmark", "--sweep"])
+    assert main() == 0
+    out = capsys.readouterr().out
+    assert "BASELINE" in out and "worst case" in out.lower()

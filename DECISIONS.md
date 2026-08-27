@@ -97,9 +97,9 @@ Five minutes. Open on the problem, not the architecture.
 5. **The design we killed.** The first engine aimed each balance retry at a
    hardcoded Indian-payroll prior and scored +41%. The sensitivity sweep
    shifted the world's payday by three days, the prior stayed fixed, and the
-   advantage degraded to +11.3% -- it was being told the answer more than
+   advantage degraded to +8.7% -- it was being told the answer more than
    reading the world. Spreading attempts evenly across the cycle needs no
-   payday belief and holds at +44.4% worst case. Say this out loud in the video: building the
+   payday belief and holds at +46.5% worst case. Say this out loud in the video: building the
    clever version, testing it honestly, and shipping the robust one is the
    whole argument for the methodology.
 6. **The live failure.** A real test-mode payment returned

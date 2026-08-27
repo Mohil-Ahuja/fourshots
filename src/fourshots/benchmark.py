@@ -13,14 +13,16 @@ from __future__ import annotations
 import argparse
 import copy
 import random
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
+from statistics import mean, median
 
 from fourshots.engine import ConstraintAwareEngine
 from fourshots.params import Params, load
 from fourshots.policies import RazorpayDefault
 from fourshots.runner import Outcome, RunResult, run_cohort
-from fourshots.simulator import TERMINAL_MODES, World, build_cohort
+from fourshots.policy import IST
+from fourshots.simulator import TERMINAL_MODES, Mandate, World, build_cohort
 
 MONTH = date(2026, 9, 1)
 
@@ -93,6 +95,78 @@ def print_headline(params: Params) -> tuple[RunResult, RunResult]:
     return baseline, engine
 
 
+
+def print_costs(cohort: list[Mandate], baseline: RunResult, engine: RunResult) -> None:
+    """Report where the engine is WORSE than the documented default.
+
+    The headline is a net figure and net figures hide things. Two costs are
+    real and neither is visible in the summary table:
+
+    Cash-flow lag. The engine deliberately waits -- for money to arrive, for an
+    outage to clear -- so recoveries land later. A merchant feels that as
+    delayed cash even when the total is higher, and a reader is entitled to
+    know the size of the delay before accepting the trade.
+
+    Mandate-level regressions. Aggregate improvement is compatible with
+    individual losses. Some mandates the baseline recovered, the engine does
+    not -- mostly customer-absent declines, where the engine escalates to a
+    person while the baseline retries blindly and occasionally gets lucky.
+
+    Printed every run, so the trade-off travels with the headline instead of
+    being something a reader has to think to ask for.
+    """
+    by_id = {m.id: m for m in cohort}
+
+    def lags(result: RunResult) -> list[float]:
+        out = []
+        for cycle in result.cycles:
+            if cycle.recovered_at is None:
+                continue
+            mandate = by_id[cycle.mandate_id]
+            due = datetime(MONTH.year, MONTH.month, mandate.debit_day, 9, 0, tzinfo=IST)
+            out.append((cycle.recovered_at - due).total_seconds() / 86400)
+        return sorted(out)
+
+    baseline_lag, engine_lag = lags(baseline), lags(engine)
+
+    def p90(values: list[float]) -> float:
+        return values[int(0.9 * (len(values) - 1))] if values else 0.0
+
+    print()
+    print("WHERE THE ENGINE IS WORSE")
+    print()
+    print("Cash-flow lag -- days from due date to recovery")
+    print(f"{'':12s} {'median':>8s} {'mean':>8s} {'p90':>8s} {'max':>8s}")
+    for label, values in (("baseline", baseline_lag), ("fourshots", engine_lag)):
+        print(f"{label:12s} {median(values):>8.1f} {mean(values):>8.1f} "
+              f"{p90(values):>8.1f} {max(values):>8.1f}")
+
+    recovered_by_baseline = {c.mandate_id for c in baseline.cycles if c.recovered}
+    recovered_by_engine = {c.mandate_id for c in engine.cycles if c.recovered}
+    lost = recovered_by_baseline - recovered_by_engine
+    gained = recovered_by_engine - recovered_by_baseline
+
+    lost_value = sum((by_id[m].amount for m in lost), Decimal(0))
+    gained_value = sum((by_id[m].amount for m in gained), Decimal(0))
+
+    print()
+    print("Mandate-level regressions")
+    print(f"  lost   (baseline recovered, engine did not): {len(lost):>4}  "
+          f"INR {_rupees(lost_value)}")
+    print(f"  gained (engine recovered, baseline did not): {len(gained):>4}  "
+          f"INR {_rupees(gained_value)}")
+    if lost_value:
+        print(f"  gained-to-lost value ratio: {float(gained_value / lost_value):.1f}x")
+
+    causes: dict[str, int] = {}
+    for mandate_id in lost:
+        mode = by_id[mandate_id].true_mode.value
+        causes[mode] = causes.get(mode, 0) + 1
+    if causes:
+        listed = ", ".join(f"{k} {v}" for k, v in sorted(causes.items(), key=lambda kv: -kv[1]))
+        print(f"  regression causes: {listed}")
+
+
 def _shift_payday(params: Params, days: int) -> Params:
     """Move the world's payday distribution without touching the engine.
 
@@ -148,7 +222,9 @@ def main() -> int:
     args = parser.parse_args()
 
     params = load()
-    print_headline(params)
+    baseline, engine = print_headline(params)
+    cohort, _ = run(RazorpayDefault(params.baseline_offsets_days), params)
+    print_costs(cohort, baseline, engine)
     if args.sweep:
         print_sweep(params)
     return 0

@@ -9,7 +9,7 @@ structurally here rather than assumed.
 
 import dataclasses
 import random
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -168,12 +168,31 @@ def test_failure_returns_a_code_and_success_does_not(params, rng) -> None:
     assert ok.cleared and ok.razorpay_code is None
 
 
-def test_issuer_outage_is_stable_within_a_run(params, rng) -> None:
-    """Downtime must not be re-rolled on every query, or a policy could
-    'discover' an outage had ended by asking twice."""
+def test_issuer_down_mandate_actually_fails_then_recovers(params, rng) -> None:
+    """An issuer-down mandate must experience a real outage at its debit.
+
+    This previously consulted a random daily outage schedule, so such a mandate
+    cleared on its first attempt unless an outage happened to land on that day
+    -- roughly a 0.8% chance. The mode was effectively inert and 11.8% of the
+    declared cohort never exercised it.
+    """
     world = World(params, rng)
-    day = date(2026, 9, 12)
-    assert world._outage_on(day) == world._outage_on(day)
+    m = mandate(true_mode=FailureMode.ISSUER_DOWN, outage_hours=6.0)
+    start = at(26)
+
+    assert not world.attempt(m, start, start).cleared
+    assert not world.attempt(m, start + timedelta(hours=3), start).cleared
+    assert world.attempt(m, start + timedelta(hours=7), start).cleared
+
+
+def test_issuer_outage_duration_is_stable_within_a_run(params, rng) -> None:
+    """Outage length is fixed per mandate, so a policy cannot 'discover' it
+    ended early by asking twice."""
+    world = World(params, rng)
+    m = mandate(true_mode=FailureMode.ISSUER_DOWN, outage_hours=6.0)
+    start = at(26)
+    probe = start + timedelta(hours=3)
+    assert world.attempt(m, probe, start).cleared == world.attempt(m, probe, start).cleared
 
 
 # --- Unmappable codes ------------------------------------------------------
