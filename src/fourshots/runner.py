@@ -36,7 +36,16 @@ from fourshots.policy import (
     next_execution_window,
 )
 from fourshots.policies import RetryPolicy
-from fourshots.simulator import Mandate, Observation, World
+from fourshots.simulator import FailureMode, Mandate, Observation, World
+
+
+UNREPAIRABLE_MODES = frozenset({FailureMode.MANDATE_DEAD})
+"""Ground-truth modes where the mandate itself is gone, not merely blocked.
+
+An expired card, a breached per-transaction limit or an unusable instrument can
+all be fixed by the customer re-authorising. A VPA that no longer resolves
+cannot -- there is nothing left to repair.
+"""
 
 
 class Outcome:
@@ -56,6 +65,14 @@ class CycleResult:
     outcome: str
     attempts_used: int
     recovered_at: datetime | None
+    repairable: bool
+    """Ground truth: whether the underlying mandate could be re-authorised.
+
+    Scored from the world, not from anything the policy saw. Keeping the
+    information barrier on the *policy* is what makes the comparison fair;
+    scoring the outcome honestly requires ground truth, and withholding it
+    here would only let a policy take credit it has not earned.
+    """
 
     @property
     def recovered(self) -> bool:
@@ -65,12 +82,19 @@ class CycleResult:
     def mandate_survived(self) -> bool:
         """Whether the mandate lives to see another cycle.
 
-        A cycle that exhausts its budget is cancelled. Stopping early -- because
-        the policy recognised the debit could not succeed and escalated instead
-        of burning attempts -- leaves the mandate intact and re-authorisable.
-        This is the difference between losing one payment and losing a customer.
+        A cycle that exhausts its budget is cancelled. Stopping early leaves the
+        mandate intact *only if the mandate was repairable to begin with* --
+        an expired card or a breached limit can be re-authorised by the
+        customer, but a VPA that no longer exists cannot.
+
+        The distinction matters because it is exactly where this metric could
+        flatter the engine. Stopping early on a dead mandate is still the right
+        call -- it saves three wasted attempts -- but it does not save a
+        customer, and counting it as though it did would be dishonest.
         """
-        return self.outcome in (Outcome.RECOVERED, Outcome.STOPPED_EARLY)
+        if self.outcome == Outcome.RECOVERED:
+            return True
+        return self.outcome == Outcome.STOPPED_EARLY and self.repairable
 
 
 @dataclass
@@ -174,7 +198,8 @@ def run_cycle(
 
         if result.cleared:
             return CycleResult(
-                mandate.id, mandate.amount, Outcome.RECOVERED, attempts_used, now
+                mandate.id, mandate.amount, Outcome.RECOVERED, attempts_used, now,
+                repairable=mandate.true_mode not in UNREPAIRABLE_MODES,
             )
 
         if attempts_used >= MAX_ATTEMPTS_PER_CYCLE:
@@ -205,13 +230,15 @@ def run_cycle(
                     at=now,
                 )
             return CycleResult(
-                mandate.id, mandate.amount, Outcome.STOPPED_EARLY, attempts_used, None
+                mandate.id, mandate.amount, Outcome.STOPPED_EARLY, attempts_used, None,
+                repairable=mandate.true_mode not in UNREPAIRABLE_MODES,
             )
 
         now = _legalise(proposed, now, mandate, attempts_used, retry_policy, audit)
 
     return CycleResult(
-        mandate.id, mandate.amount, Outcome.BUDGET_EXHAUSTED, attempts_used, None
+        mandate.id, mandate.amount, Outcome.BUDGET_EXHAUSTED, attempts_used, None,
+        repairable=mandate.true_mode not in UNREPAIRABLE_MODES,
     )
 
 
