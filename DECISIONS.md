@@ -94,15 +94,43 @@ Five minutes. Open on the problem, not the architecture.
 4. **The baseline is Razorpay's own documented policy** — quote the docs line.
    Framed as a measurable improvement to a documented default, never as
    "Razorpay's retry is dumb". We are applying to work there.
-5. **The live failure.** A real test-mode payment returned
+5. **The design we killed.** The first engine aimed each balance retry at a
+   hardcoded Indian-payroll prior and scored +41%. The sensitivity sweep
+   shifted the world's payday by three days, the prior stayed fixed, and the
+   advantage collapsed to +2.2% -- it was being told the answer, not reading
+   the world. Spreading attempts evenly across the cycle needs no payday belief
+   and holds at +32.3% worst case. Say this out loud in the video: building the
+   clever version, testing it honestly, and shipping the robust one is the
+   whole argument for the methodology.
+6. **The live failure.** A real test-mode payment returned
    `international_transaction_not_allowed`, a code the taxonomy had never seen.
    It degraded to the conservative class with a 24h floor rather than crashing
    or guessing, and recorded that its own mapping confidence was `inferred`.
    Found by pointing the receiver at the real rail — the synthetic cohort would
    never have produced that code. This is the "one failure handled gracefully".
-6. **The headline result** + the sensitivity sweep behind it.
-7. **Audit chain verification live** — edit one rupee in the log, watch verify
+7. **The headline result** + the sensitivity sweep behind it.
+8. **Audit chain verification live** — edit one rupee in the log, watch verify
    fail, on camera.
+
+## Result so far (D5)
+
+2000 mandates, seed 20260827, September 2026:
+
+| | baseline | engine | delta |
+|---|---|---|---|
+| recovery rate | 45.6% | 63.5% | +39.3% |
+| recovered | INR 56.2L | INR 81.3L | +44.8% |
+| mandates saved | 912 | 1,610 | +76.5% |
+| attempts spent | 5,508 | 3,875 | -29.6% |
+| attempts per recovery | 6.04 | 3.05 | -49.5% |
+
+More money and more mandates from fewer attempts. Attempts spent on debits
+that could never clear fall from 1,540 to 598.
+
+Two corrections made before reporting, both worth telling: the payday prior
+was killed by the sweep (above), and `mandates_saved` originally counted an
+early stop on a dead mandate as a saved customer, which it is not -- fixing it
+cut the engine's figure from 1,721 to 1,610.
 
 ## Rust
 
