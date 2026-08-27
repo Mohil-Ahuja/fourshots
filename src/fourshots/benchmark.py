@@ -22,7 +22,14 @@ from fourshots.params import Params, load
 from fourshots.policies import RazorpayDefault
 from fourshots.runner import Outcome, RunResult, run_cohort
 from fourshots.policy import IST
-from fourshots.simulator import TERMINAL_MODES, Mandate, World, build_cohort
+from fourshots.simulator import (
+    _MODE_TO_DESCRIPTION,
+    TERMINAL_MODES,
+    Mandate,
+    World,
+    build_cohort,
+)
+from fourshots.triage import NullTriager, TriageVerdict, default_triager
 
 MONTH = date(2026, 9, 1)
 
@@ -167,6 +174,61 @@ def print_costs(cohort: list[Mandate], baseline: RunResult, engine: RunResult) -
         print(f"  regression causes: {listed}")
 
 
+class _OracleTriager:
+    """Reads the rail's prose perfectly. Not a model -- an upper bound.
+
+    Answers the only question worth asking before trusting an AI layer: if it
+    were flawless, how much would it be worth? Any real model scores at or
+    below this.
+    """
+
+    name = "oracle"
+    _BY_PROSE = {prose: mode.value for mode, prose in _MODE_TO_DESCRIPTION.items()}
+
+    def triage(self, code: str, description: str | None):
+        resolved = self._BY_PROSE.get(description or "")
+        if resolved is None:
+            return None
+        return TriageVerdict(code, resolved, 1.0, "oracle reading", "oracle")
+
+
+def print_ai_layer(params: Params) -> None:
+    """Size the AI layer honestly, including when the answer is 'not much'.
+
+    The model reads prose attached to decline codes the taxonomy cannot map.
+    That gap is real but small, so the headroom is small, and reporting it as
+    small is the point: the deterministic constraint work does the heavy
+    lifting, and inflating the AI's contribution would be the easiest and least
+    defensible claim in the project.
+    """
+    _, without = run(ConstraintAwareEngine(NullTriager()), params)
+    _, perfect = run(ConstraintAwareEngine(_OracleTriager()), params)
+
+    active = default_triager()
+    cached = getattr(active, "__len__", lambda: 0)()
+
+    print()
+    print("AI LAYER -- triage of unreadable decline codes")
+    print()
+    print(f"{'':26s} {'recovered':>12s} {'attempts':>10s}")
+    print(f"{'no triage (default)':26s} {_rupees(without.recovered_value):>12s} "
+          f"{without.attempts_spent:>10,}")
+    print(f"{'perfect triage (oracle)':26s} {_rupees(perfect.recovered_value):>12s} "
+          f"{perfect.attempts_spent:>10,}")
+
+    headroom = perfect.recovered_value - without.recovered_value
+    share = float(headroom / without.recovered_value) if without.recovered_value else 0.0
+    print()
+    print(f"Ceiling on what any triage layer can add here: "
+          f"INR {_rupees(headroom)} ({share:+.2%}).")
+    print(f"Active triager: {getattr(active, 'name', '?')} "
+          f"({cached} cached verdict(s)).")
+    if not cached:
+        print("No verdicts cached, so triage is inert in this run -- the engine "
+              "behaves exactly as it does without the layer.")
+        print("Populate with fourshots.triage.refresh_cache() and commit the result.")
+
+
 def _shift_payday(params: Params, days: int) -> Params:
     """Move the world's payday distribution without touching the engine.
 
@@ -225,6 +287,7 @@ def main() -> int:
     baseline, engine = print_headline(params)
     cohort, _ = run(RazorpayDefault(params.baseline_offsets_days), params)
     print_costs(cohort, baseline, engine)
+    print_ai_layer(params)
     if args.sweep:
         print_sweep(params)
     return 0

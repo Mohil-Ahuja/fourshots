@@ -180,7 +180,11 @@ def run_cycle(
     while attempts_used < MAX_ATTEMPTS_PER_CYCLE:
         result = world.attempt(mandate, now, cycle_start)
         attempts_used += 1
-        history.append(DeclineRecord(now, result.razorpay_code, result.npci_code))
+        history.append(
+            DeclineRecord(
+                now, result.razorpay_code, result.npci_code, result.description
+            )
+        )
 
         if audit:
             audit.append(

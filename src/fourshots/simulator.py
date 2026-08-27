@@ -87,11 +87,67 @@ _MODE_TO_NPCI: dict[FailureMode, str] = {
 
 # Codes the taxonomy has no mapping for. Real rails emit these; a cohort
 # without them would flatter the engine.
-_UNMAPPABLE_CODES = (
+_UNFAMILIAR_CODES: tuple[str, ...] = (
     "issuer_risk_hold",
     "npci_reject_u91",
     "acquirer_policy_decline",
+    "bank_internal_5023",
 )
+"""Code strings the taxonomy has no mapping for.
+
+Real rails emit codes a lookup table has never seen -- confirmed live, when a
+test-mode payment returned `international_transaction_not_allowed`.
+"""
+
+_MODE_TO_DESCRIPTION: dict[FailureMode, str] = {
+    FailureMode.BALANCE: (
+        "The account did not have sufficient funds available when the debit "
+        "was presented."
+    ),
+    FailureMode.ISSUER_DOWN: (
+        "The customer's bank did not respond while the debit was being "
+        "presented. The request may succeed once the bank is reachable again."
+    ),
+    FailureMode.PSP_TRANSIENT: (
+        "A temporary fault at the payment provider prevented this transaction "
+        "from being completed."
+    ),
+    FailureMode.CUSTOMER_ABSENT: (
+        "The collect request was delivered to the customer but was not "
+        "approved before it expired."
+    ),
+    FailureMode.AUTH_REQUIRED: (
+        "This debit requires additional authentication from the customer "
+        "before it can be processed."
+    ),
+    FailureMode.MANDATE_DEAD: (
+        "The registration for this customer is no longer valid and must be "
+        "re-authorised before further debits can be presented."
+    ),
+    FailureMode.LIMIT_BREACH: (
+        "The requested amount exceeds the per-transaction ceiling configured "
+        "on the payer account."
+    ),
+    FailureMode.INSTRUMENT_REJECTED: (
+        "The payment instrument on file cannot be used at this merchant."
+    ),
+}
+"""Prose a rail returns alongside a decline, keyed by what actually happened.
+
+A rail describes the real failure whether or not the code is one you recognise,
+so the description is generated from the true mode rather than picked
+independently of it. An earlier version chose the prose at random, which meant
+a message saying "account frozen" could accompany a plain balance shortfall --
+incoherent, and it made correct triage worth nothing because the text pointed
+somewhere the world did not.
+
+The text names the symptom, never the internal mode; a test enforces that, so
+a model reading it is diagnosing rather than being handed the answer.
+
+Honest caveat: we wrote these sentences. A model reading them is partly reading
+our phrasing, so this measures the mechanism, not field accuracy. The live rail
+is where that gets validated.
+"""
 
 # Modes that no amount of waiting or retrying will resolve.
 TERMINAL_MODES = frozenset(
@@ -151,6 +207,8 @@ class DeclineRecord:
     at: datetime
     razorpay_code: str | None
     npci_code: str | None = None
+    description: str | None = None
+    """Prose the rail returned. The only field a model is asked to read."""
 
 
 @dataclass(frozen=True)
@@ -166,6 +224,7 @@ class AttemptResult:
     at: datetime
     razorpay_code: str | None
     npci_code: str | None = None
+    description: str | None = None
 
 
 @dataclass(frozen=True)
@@ -220,10 +279,19 @@ class World:
             return AttemptResult(True, at, None, None)
 
         if mandate.code_is_unmappable:
-            # An unreadable aggregator code, and no rail code to fall back on.
-            return AttemptResult(False, at, self._rng.choice(_UNMAPPABLE_CODES), None)
+            # An unreadable code and no rail code to fall back on -- but the
+            # rail still says, in prose, what actually went wrong.
+            return AttemptResult(
+                False,
+                at,
+                self._rng.choice(_UNFAMILIAR_CODES),
+                None,
+                _MODE_TO_DESCRIPTION[mode],
+            )
 
-        return AttemptResult(False, at, _MODE_TO_CODE[mode], _MODE_TO_NPCI.get(mode))
+        return AttemptResult(
+            False, at, _MODE_TO_CODE[mode], _MODE_TO_NPCI.get(mode), None
+        )
 
     def _would_clear(
         self,

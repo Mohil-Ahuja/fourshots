@@ -177,7 +177,7 @@ would never have produced that code.
 ```bash
 pip install -e ".[dev]"
 
-pytest -q                          # 192 tests
+pytest -q                          # 216 tests
 python tools/mutation_audit.py     # 12/12 mutations caught
 python -m fourshots.benchmark      # reproduce the headline table
 ```
@@ -213,12 +213,36 @@ audited line by line, and fails by producing a plausible-sounding wrong date.
 Attempt accounting, window legality, notice periods, AFA thresholds and
 terminal detection are all deterministic and hand-checkable.
 
-**Where it earns its place:** reading the natural-language `error_description`
-attached to codes the taxonomy cannot map. That gap is measured, not assumed —
-unreadable codes currently get one cautious attempt and then stop, and the
-results report what that caution costs. It is the one place deterministic code
-genuinely cannot help, and it is bounded so it can never widen what the engine
-is permitted to do.
+**Where it earns its place:** reading the natural-language description a rail
+attaches to codes the taxonomy cannot map. A lookup table cannot read prose; a
+model can. `triage.py` asks Claude to pick from the *closed set* of failure
+classes the taxonomy already defines, and the deterministic engine then does
+exactly what it always does with that class.
+
+The bounding is the design:
+
+- The model proposes a **classification, never a schedule**. Same attempt
+  budget, same execution windows, same notice period, same AFA thresholds.
+- A verdict below the confidence floor is discarded, and so is one naming a
+  class that does not exist — a model inventing a category is a reason to
+  distrust it, not to snap to the nearest match. The prompt gives it an
+  explicit way to say "I cannot tell", because a confident wrong answer costs
+  an attempt that cannot be recovered.
+- Any failure — no credentials, network, malformed response — returns nothing
+  and the conservative default stands. An outage at the model provider must not
+  change scheduling behaviour.
+- Verdicts are **cached and committed**, so benchmark runs stay reproducible
+  and every model judgement behind the result can be read and disputed.
+
+**And it is worth about +1.76%.** We measured the ceiling with an oracle that
+reads the prose perfectly: `python -m fourshots.benchmark` prints it every run.
+Any real model scores at or below that. The gap is small because unreadable
+codes are only ~2% of the cohort.
+
+That number is the honest answer to "how much is the AI doing here": the
+deterministic constraint work delivers +51%, the AI layer adds up to +1.8% on
+top. Inflating that would have been the easiest claim in the project and the
+least defensible one.
 
 ## Honest limitations
 

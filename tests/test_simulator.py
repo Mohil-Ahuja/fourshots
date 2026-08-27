@@ -77,13 +77,41 @@ def test_observation_carries_only_merchant_visible_facts() -> None:
 
 
 def test_attempt_result_reveals_only_outcome_and_code() -> None:
-    """Both code fields are views of what the rail said. Neither is a leak."""
+    """Every field is something the rail told the merchant. The description is
+    prose the rail returned, not a window into the world model."""
     assert {f.name for f in dataclasses.fields(AttemptResult)} == {
         "cleared",
         "at",
         "razorpay_code",
         "npci_code",
+        "description",
     }
+
+
+def test_description_does_not_name_the_true_failure_mode() -> None:
+    """The prose a rail returns must not hand the engine ground truth.
+
+    The triage layer reads these descriptions, so if one contained the internal
+    mode name the model would be reading the answer rather than the symptom.
+    """
+    from fourshots.simulator import _MODE_TO_DESCRIPTION
+
+    mode_names = {m.value for m in FailureMode}
+    for mode, description in _MODE_TO_DESCRIPTION.items():
+        lowered = description.lower()
+        for name in mode_names:
+            assert name not in lowered, f"{mode} description leaks mode {name!r}"
+
+
+def test_every_failure_mode_has_readable_prose() -> None:
+    """A rail describes the failure whether or not the code is familiar. A
+    missing entry would make that mode silently untriageable."""
+    from fourshots.simulator import _MODE_TO_DESCRIPTION
+
+    for mode in FailureMode:
+        if mode is FailureMode.NONE:
+            continue
+        assert mode in _MODE_TO_DESCRIPTION, f"{mode} has no description"
 
 
 # --- Balance model ---------------------------------------------------------

@@ -48,7 +48,8 @@ from fourshots.policy import (
     next_execution_window,
 )
 from fourshots.simulator import Observation
-from fourshots.taxonomy import Blocker, classify
+from fourshots.taxonomy import Blocker, UNCLASSIFIED, Classification, classify
+from fourshots.triage import NullTriager, Triager
 
 BALANCE_RETRY_OFFSETS_DAYS: tuple[int, ...] = (8, 16, 25)
 """Days after the failed debit at which to place each balance retry.
@@ -92,18 +93,54 @@ class ConstraintAwareEngine:
 
     name = "constraint_aware_engine"
 
-    def propose(self, observation: Observation) -> datetime | None:
-        if MAX_ATTEMPTS_PER_CYCLE - observation.attempts_used <= 0:
-            return None
+    def __init__(self, triager: Triager | None = None) -> None:
+        """`triager` reads the prose attached to codes the taxonomy cannot map.
 
+        Defaults to the offline no-op, so the engine behaves exactly as it did
+        before the AI layer existed unless one is supplied. The triager can
+        only narrow a classification -- every schedule it leads to still goes
+        through the same deterministic path as any other.
+        """
+        self._triager = triager or NullTriager()
+
+    def _classify(self, observation: Observation) -> Classification:
+        """Read the decline, asking the triager only when the table cannot."""
         decline = observation.last_decline
-        # Both views of the same event. The taxonomy prefers the rail's own
-        # code where it is present and definite, because it is more specific --
-        # Z8 is terminal, where the aggregator's rendering of it may not be.
         classification = classify(
             razorpay_code=decline.razorpay_code if decline else None,
             npci_code=decline.npci_code if decline else None,
         )
+
+        if classification.failure_class is not UNCLASSIFIED or decline is None:
+            return classification
+
+        verdict = self._triager.triage(decline.razorpay_code or "", decline.description)
+        if verdict is None:
+            return classification
+
+        resolved = verdict.resolved()
+        if resolved is None or resolved is UNCLASSIFIED:
+            # A verdict naming nothing usable changes nothing. The conservative
+            # default stands.
+            return classification
+
+        return Classification(
+            failure_class=resolved,
+            confidence=classification.confidence,
+            source_code=decline.razorpay_code or "",
+            note=(
+                f"triaged from description by {verdict.model} "
+                f"(confidence {verdict.confidence:.2f}): {verdict.reasoning}"
+            ),
+        )
+
+    def propose(self, observation: Observation) -> datetime | None:
+        if MAX_ATTEMPTS_PER_CYCLE - observation.attempts_used <= 0:
+            return None
+
+        # Both views of the same event, plus -- only when the table cannot
+        # read the code at all -- a model's reading of the rail's prose.
+        classification = self._classify(observation)
         failure_class = classification.failure_class
         blocker = failure_class.blocker
 
