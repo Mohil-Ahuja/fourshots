@@ -124,3 +124,20 @@ def test_coverage_is_reportable_and_mostly_documented() -> None:
     cov = coverage()
     assert cov["documented"] + cov["inferred"] == cov["total_codes"]
     assert cov["documented"] > cov["inferred"]
+
+
+# --- Regression: gaps found against live rail data -------------------------
+
+def test_international_card_rejection_is_terminal() -> None:
+    """Found live: a real test-mode payment returned
+    `international_transaction_not_allowed` and fell through to UNCLASSIFIED,
+    which parked it behind a 24-hour floor. Safe, but wrong -- the same
+    instrument can never clear at a domestic-only merchant, so the correct
+    answer is zero further attempts, not a delayed one."""
+    from fourshots.taxonomy import INSTRUMENT_REJECTED
+
+    got = classify(razorpay_code="international_transaction_not_allowed")
+    assert got.failure_class is INSTRUMENT_REJECTED
+    assert got.is_terminal
+    assert got.failure_class.min_backoff_hours == 0.0
+    assert not got.failure_class.silently_retryable

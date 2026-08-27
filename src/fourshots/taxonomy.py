@@ -184,6 +184,28 @@ LIMIT_BREACH = FailureClass(
     typical_resolution_hours=None,
 )
 
+INSTRUMENT_REJECTED = FailureClass(
+    name="instrument_rejected",
+    blocker=Blocker.MANDATE_REPAIR,
+    silently_retryable=False,
+    min_backoff_hours=0.0,
+    typical_resolution_hours=None,
+)
+"""The instrument itself is not acceptable to this merchant or rail.
+
+Distinct from a dead mandate: the registration is fine, but the card or
+account behind it can never clear here -- an international card at a
+domestic-only merchant, for example. Retrying the same instrument is
+guaranteed to fail, so the only useful move is to ask the customer for a
+different one.
+
+Added after a live test-mode payment returned
+`international_transaction_not_allowed`, a code the taxonomy had no mapping
+for. It degraded to UNCLASSIFIED and its 24-hour floor, which was safe but
+wrong: this needs zero further attempts, not a delayed one.
+"""
+
+
 UNCLASSIFIED = FailureClass(
     name="unclassified",
     blocker=Blocker.UNKNOWN,
@@ -202,6 +224,7 @@ ALL_CLASSES: tuple[FailureClass, ...] = (
     AUTH_REQUIRED,
     MANDATE_DEAD,
     LIMIT_BREACH,
+    INSTRUMENT_REJECTED,
     UNCLASSIFIED,
 )
 
@@ -284,6 +307,12 @@ _RAZORPAY_UPI: dict[str, Mapping_] = {
         Confidence.INFERRED,
         "Ambiguous: 'funds could not be debited' spans balance and risk "
         "declines. Left unclassified rather than guessed.",
+    ),
+    "international_transaction_not_allowed": Mapping_(
+        INSTRUMENT_REJECTED,
+        Confidence.DOCUMENTED,
+        "Merchant accepts domestic (Indian) cards only. Observed live in "
+        "test mode; the same instrument can never clear here.",
     ),
     "credit_failed": Mapping_(
         PSP_TRANSIENT,
