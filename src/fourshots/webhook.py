@@ -72,6 +72,7 @@ class DeclineObserved:
     raw_code: str | None
     raw_reason: str | None
     raw_description: str | None
+    npci_code: str | None
     classification: Classification
 
 
@@ -138,6 +139,28 @@ def _paise_to_rupees(amount: Any) -> Decimal:
     return Decimal(int(amount)) / Decimal(100)
 
 
+def _npci_code(payment: dict[str, Any]) -> str | None:
+    """Pull the rail's own response code out of a payment entity, if present.
+
+    Razorpay's error-mapping layer normally translates NPCI codes into its own
+    `error_reason` strings before a webhook is sent, so this is usually absent
+    on a standard integration -- `acquirer_data` carries identifiers (`rrn`,
+    `upi_transaction_id`) rather than response codes. Merchants with direct PSP
+    or bank connectivity do receive it, and it is strictly more informative
+    than the translation: Z8 states a breached limit, which is terminal, where
+    the rendered reason may only say the payment was declined.
+
+    Read from the two places a code plausibly appears, and returns None
+    otherwise. Absence is the normal case, not an error.
+    """
+    acquirer = payment.get("acquirer_data") or {}
+    for key in ("npci_response_code", "response_code", "bank_response_code"):
+        value = acquirer.get(key) or payment.get(key)
+        if value:
+            return str(value).strip().upper()
+    return None
+
+
 def parse_event(raw: dict[str, Any]) -> ParsedEvent | None:
     """Turn a verified webhook payload into a domain event.
 
@@ -153,6 +176,7 @@ def parse_event(raw: dict[str, Any]) -> ParsedEvent | None:
         # `error_code` is the coarse envelope ("BAD_REQUEST_ERROR") and is far
         # too broad to schedule against, so it is recorded but not classified on.
         reason = payment.get("error_reason")
+        npci = _npci_code(payment)
         return DeclineObserved(
             payment_id=payment.get("id", ""),
             subscription_id=payment.get("subscription_id")
@@ -164,7 +188,8 @@ def parse_event(raw: dict[str, Any]) -> ParsedEvent | None:
             raw_code=payment.get("error_code"),
             raw_reason=reason,
             raw_description=payment.get("error_description"),
-            classification=classify(razorpay_code=reason),
+            npci_code=npci,
+            classification=classify(razorpay_code=reason, npci_code=npci),
         )
 
     if event.startswith("payment.downtime."):

@@ -103,6 +103,7 @@ async def razorpay_webhook(request: Request, response: Response) -> dict[str, An
                 # later taxonomy correction can be applied to historic logs.
                 "raw_code": parsed.raw_code,
                 "raw_reason": parsed.raw_reason,
+                "npci_code": parsed.npci_code,
                 "raw_description": parsed.raw_description,
                 "failure_class": cls.failure_class.name,
                 "blocker": cls.failure_class.blocker.value,

@@ -72,6 +72,6 @@ class RazorpayDefault:
             return None
 
         first_attempt_at = (
-            observation.history[0][0] if observation.history else observation.now
+            observation.history[0].at if observation.history else observation.now
         )
         return first_attempt_at + timedelta(days=self._offsets[retry_index])

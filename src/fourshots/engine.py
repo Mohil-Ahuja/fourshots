@@ -96,7 +96,14 @@ class ConstraintAwareEngine:
         if MAX_ATTEMPTS_PER_CYCLE - observation.attempts_used <= 0:
             return None
 
-        classification = classify(razorpay_code=observation.last_code)
+        decline = observation.last_decline
+        # Both views of the same event. The taxonomy prefers the rail's own
+        # code where it is present and definite, because it is more specific --
+        # Z8 is terminal, where the aggregator's rendering of it may not be.
+        classification = classify(
+            razorpay_code=decline.razorpay_code if decline else None,
+            npci_code=decline.npci_code if decline else None,
+        )
         failure_class = classification.failure_class
         blocker = failure_class.blocker
 
@@ -142,7 +149,7 @@ class ConstraintAwareEngine:
         if retry_index >= len(BALANCE_RETRY_OFFSETS_DAYS):
             return None
 
-        first_attempt_at = observation.history[0][0]
+        first_attempt_at = observation.history[0].at
         target = first_attempt_at + timedelta(
             days=BALANCE_RETRY_OFFSETS_DAYS[retry_index]
         )

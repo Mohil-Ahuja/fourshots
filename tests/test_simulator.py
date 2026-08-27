@@ -77,10 +77,12 @@ def test_observation_carries_only_merchant_visible_facts() -> None:
 
 
 def test_attempt_result_reveals_only_outcome_and_code() -> None:
+    """Both code fields are views of what the rail said. Neither is a leak."""
     assert {f.name for f in dataclasses.fields(AttemptResult)} == {
         "cleared",
         "at",
         "razorpay_code",
+        "npci_code",
     }
 
 

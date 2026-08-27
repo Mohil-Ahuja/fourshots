@@ -24,7 +24,7 @@ from fourshots.policy import (
 )
 from fourshots.policies import RazorpayDefault
 from fourshots.runner import Outcome, run_cohort
-from fourshots.simulator import Observation, World, build_cohort
+from fourshots.simulator import DeclineRecord, Observation, World, build_cohort
 
 MONTH = date(2026, 9, 1)
 FIRST = datetime(2026, 9, 26, 9, 0, tzinfo=IST)
@@ -40,7 +40,12 @@ def engine():
     return ConstraintAwareEngine()
 
 
-def observation(code: str | None, attempts_used: int = 1, now: datetime | None = None):
+def observation(
+    code: str | None,
+    attempts_used: int = 1,
+    now: datetime | None = None,
+    npci_code: str | None = None,
+):
     now = now or FIRST
     return Observation(
         mandate_id="mand_test",
@@ -48,21 +53,39 @@ def observation(code: str | None, attempts_used: int = 1, now: datetime | None =
         purpose=MandatePurpose.GENERAL,
         now=now,
         attempts_used=attempts_used,
-        history=tuple((FIRST + timedelta(days=i), code) for i in range(attempts_used)),
+        history=tuple(
+            DeclineRecord(FIRST + timedelta(days=i), code, npci_code)
+            for i in range(attempts_used)
+        ),
     )
 
 
 # --- Per-code decisions ----------------------------------------------------
 
 @pytest.mark.parametrize(
-    "code", ["invalid_vpa", "international_transaction_not_allowed", "Z8"]
+    "code", ["invalid_vpa", "international_transaction_not_allowed"]
 )
 def test_terminal_codes_spend_no_further_attempts(engine, code: str) -> None:
     """The cheapest win available: recognising on attempt one that no later
     attempt can succeed, instead of burning three discovering it."""
-    if code == "Z8":
-        pytest.skip("Z8 arrives as an NPCI code; covered in taxonomy tests")
     assert engine.propose(observation(code)) is None
+
+
+def test_npci_limit_breach_is_recognised_as_terminal(engine) -> None:
+    """Z8 says the amount breached a cap, which no delay can fix. It arrives
+    as a rail code, so this only works because the NPCI path is actually wired
+    through -- it was dead code until the audit found it."""
+    assert engine.propose(observation("payment_declined", npci_code="Z8")) is None
+
+
+def test_rail_code_sharpens_an_ambiguous_aggregator_code(engine) -> None:
+    """`payment_declined` alone is ambiguous and stays unclassified, so the
+    engine spends one cautious attempt. With Z9 alongside it, the same decline
+    is definitely a balance failure and is scheduled accordingly."""
+    vague = engine.propose(observation("payment_declined"))
+    sharpened = engine.propose(observation("payment_declined", npci_code="Z9"))
+    assert vague is not None and sharpened is not None
+    assert sharpened > vague, "a balance failure must wait longer than a cautious retry"
 
 
 def test_dead_mandate_stops_immediately(engine) -> None:

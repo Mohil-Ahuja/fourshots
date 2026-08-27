@@ -68,6 +68,23 @@ _MODE_TO_CODE: dict[FailureMode, str] = {
     FailureMode.INSTRUMENT_REJECTED: "international_transaction_not_allowed",
 }
 
+# Ground-truth mode -> the NPCI response code the rail returns underneath.
+#
+# Razorpay's own error-mapping layer translates these into its `error_reason`
+# strings before they reach a merchant webhook, so in a standard Razorpay
+# integration only the translation is visible. Merchants with direct PSP or
+# bank connectivity see the raw code, and it is strictly more specific -- Z8
+# says "limit breached", which is terminal, where Razorpay's rendering may
+# only say "payment_declined". The engine uses it when present and works
+# without it when absent.
+_MODE_TO_NPCI: dict[FailureMode, str] = {
+    FailureMode.BALANCE: "Z9",
+    FailureMode.ISSUER_DOWN: "U28",
+    FailureMode.PSP_TRANSIENT: "U69",
+    FailureMode.LIMIT_BREACH: "Z8",
+    FailureMode.CUSTOMER_ABSENT: "U69",
+}
+
 # Codes the taxonomy has no mapping for. Real rails emit these; a cohort
 # without them would flatter the engine.
 _UNMAPPABLE_CODES = (
@@ -120,10 +137,26 @@ class Mandate:
 
 
 @dataclass(frozen=True)
+class DeclineRecord:
+    """One observed decline: when, and what the rail called it.
+
+    Both codes are carried because they are different views of the same event.
+    `razorpay_code` is the aggregator's translation and is always present;
+    `npci_code` is the rail's own response code, more specific, and available
+    only to integrations that see it. The taxonomy prefers the NPCI code where
+    it is both present and definite.
+    """
+
+    at: datetime
+    razorpay_code: str | None
+    npci_code: str | None = None
+
+
+@dataclass(frozen=True)
 class AttemptResult:
     """What a policy learns from spending an attempt.
 
-    Deliberately narrow: cleared or not, and the code the rail returned. No
+    Deliberately narrow: cleared or not, and the codes the rail returned. No
     balance, no mode, no hint about when the blocker will clear. This is the
     information barrier made concrete.
     """
@@ -131,6 +164,7 @@ class AttemptResult:
     cleared: bool
     at: datetime
     razorpay_code: str | None
+    npci_code: str | None = None
 
 
 @dataclass(frozen=True)
@@ -146,11 +180,11 @@ class Observation:
     purpose: MandatePurpose
     now: datetime
     attempts_used: int
-    history: tuple[tuple[datetime, str | None], ...] = ()
+    history: tuple[DeclineRecord, ...] = ()
 
     @property
-    def last_code(self) -> str | None:
-        return self.history[-1][1] if self.history else None
+    def last_decline(self) -> DeclineRecord | None:
+        return self.history[-1] if self.history else None
 
 
 class World:
@@ -191,17 +225,17 @@ class World:
         mode = mandate.true_mode
 
         if mode is FailureMode.NONE:
-            return AttemptResult(True, at, None)
+            return AttemptResult(True, at, None, None)
 
         cleared = self._would_clear(mandate, at, mode)
         if cleared:
-            return AttemptResult(True, at, None)
+            return AttemptResult(True, at, None, None)
 
         if mandate.code_is_unmappable:
-            code = self._rng.choice(_UNMAPPABLE_CODES)
-        else:
-            code = _MODE_TO_CODE[mode]
-        return AttemptResult(False, at, code)
+            # An unreadable aggregator code, and no rail code to fall back on.
+            return AttemptResult(False, at, self._rng.choice(_UNMAPPABLE_CODES), None)
+
+        return AttemptResult(False, at, _MODE_TO_CODE[mode], _MODE_TO_NPCI.get(mode))
 
     def _would_clear(self, mandate: Mandate, at: datetime, mode: FailureMode) -> bool:
         """Whether the blocker behind `mode` has resolved by `at`."""

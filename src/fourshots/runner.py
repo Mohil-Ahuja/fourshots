@@ -36,7 +36,7 @@ from fourshots.policy import (
     next_execution_window,
 )
 from fourshots.policies import RetryPolicy
-from fourshots.simulator import FailureMode, Mandate, Observation, World
+from fourshots.simulator import DeclineRecord, FailureMode, Mandate, Observation, World
 
 
 UNREPAIRABLE_MODES = frozenset({FailureMode.MANDATE_DEAD})
@@ -173,13 +173,13 @@ def run_cycle(
 ) -> CycleResult:
     """Run one mandate through one execution cycle under `retry_policy`."""
     now = _first_debit_at(mandate, month)
-    history: list[tuple[datetime, str | None]] = []
+    history: list[DeclineRecord] = []
     attempts_used = 0
 
     while attempts_used < MAX_ATTEMPTS_PER_CYCLE:
         result = world.attempt(mandate, now)
         attempts_used += 1
-        history.append((now, result.razorpay_code))
+        history.append(DeclineRecord(now, result.razorpay_code, result.npci_code))
 
         if audit:
             audit.append(
@@ -190,6 +190,7 @@ def run_cycle(
                     "at": now.isoformat(),
                     "cleared": result.cleared,
                     "code": result.razorpay_code,
+                    "npci_code": result.npci_code,
                     "amount_inr": str(mandate.amount),
                 },
                 mandate_id=mandate.id,
@@ -225,6 +226,7 @@ def run_cycle(
                         "policy": retry_policy.name,
                         "attempts_used": attempts_used,
                         "last_code": result.razorpay_code,
+                        "last_npci_code": result.npci_code,
                     },
                     mandate_id=mandate.id,
                     at=now,

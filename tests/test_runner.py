@@ -22,7 +22,14 @@ from fourshots.policy import (
 )
 from fourshots.policies import RazorpayDefault
 from fourshots.runner import Outcome, run_cohort, run_cycle
-from fourshots.simulator import FailureMode, Mandate, Observation, World, build_cohort
+from fourshots.simulator import (
+    DeclineRecord,
+    FailureMode,
+    Mandate,
+    Observation,
+    World,
+    build_cohort,
+)
 
 MONTH = date(2026, 9, 1)
 
@@ -60,7 +67,10 @@ def observation(attempts_used: int, first_at: datetime, code: str = "insufficien
         purpose=MandatePurpose.GENERAL,
         now=first_at,
         attempts_used=attempts_used,
-        history=tuple((first_at + timedelta(days=i), code) for i in range(attempts_used)),
+        history=tuple(
+            DeclineRecord(first_at + timedelta(days=i), code)
+            for i in range(attempts_used)
+        ),
     )
 
 
