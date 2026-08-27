@@ -187,46 +187,58 @@ breaks the build.
 
 ---
 
-## What was got wrong
+## What the checks caught
 
-Recorded because the corrections are more informative than the result, and all
-of them are in the git history.
+Six defects the verification found before they reached a result. They are
+listed because each one is evidence that a specific check works — a claim that
+cannot be made by asserting the code is correct, only by showing what the
+checks stopped. All of them are in the git history.
 
-**A payday prior that was being told the answer.** The first engine aimed each
+**Caught by the sensitivity sweep — a payday prior that was being told the
+answer.** The first engine aimed each
 balance retry at a hardcoded Indian-payroll prior and scored well. Shifting the
 *world's* payday three days while the prior stayed fixed degraded it to +9.9%.
 Spreading attempts evenly needs no payday belief and holds at +46.9% worst
 case. The offsets are even thirds of a ~30-day cycle, derived from the cycle
 length rather than fitted.
 
-**A metric that flattered us.** `mandates_saved` counted every early stop as a
+**Caught by the mutation audit — a metric that flattered us.**
+`mandates_saved` counted every early stop as a
 saved mandate, including mandates whose VPA no longer resolved. Stopping early
 there is still right — it saves three wasted attempts — but it does not save a
 customer.
 
-**A third of the taxonomy was unreachable.** `classify()` accepted an NPCI
+**Caught by a reachability audit — a third of the taxonomy was dead code.**
+`classify()` accepted an NPCI
 response code with documented mappings for Z9, Z8, U28, U30 and U69, and
 nothing ever passed one. Z8 is terminal; the engine could not act on it because
 it never saw it.
 
-**Two failure modes were inert.** A probe counting which classes actually
+**Caught by instrumenting the engine — two failure modes were inert.**
+A probe counting which classes actually
 reached the engine found `customer_absent` and `issuer_down` — 17% of the
 cohort — never arrived. One was silently reclassified by an ambiguous rail
 code; the other cleared on its first attempt unless a rare random outage
 happened to land on the exact debit day.
 
-**Two promises the parameter file made and the code did not keep.**
-`cohort.yaml` declared 20 independent replications and a decline-mix
+**Caught by auditing the parameter file against the code — two promises it
+made that nothing kept.** `cohort.yaml` declared 20 independent replications and a decline-mix
 sensitivity range, and for a while neither was implemented — the benchmark ran
 a single cohort and swept only payday. Both are now real, and the replications
 changed what can honestly be claimed: the pre-registered seed's +49.2% sits
 above a mean of +38.8%.
 
-**A bug in the measuring instrument.** The sensitivity sweep shifted
+**Caught by a cross-check between two paths that should agree — a bug in the
+measuring instrument.** The sensitivity sweep shifted
 day-of-month values modulo 30 across a 1–31 space, folding day 31 onto day 1
 even at shift zero. It reported wrong numbers without failing, which is the
 worst kind of bug, and it had contaminated every sweep figure published up to
 that point.
+
+None of these six were found by the test suite alone. That is the argument for
+the layered verification above: a passing suite tells you the checks you thought
+of are satisfied, and every defect here was in something nobody had thought to
+check yet.
 
 ---
 
