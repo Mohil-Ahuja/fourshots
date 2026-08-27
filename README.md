@@ -34,6 +34,17 @@ longer resolves, or whose amount breaches a per-transaction cap, announces on
 attempt one that no retry can ever succeed. The documented policy retries it
 three more times anyway.
 
+![One balance curve, two attempt rows. The documented policy spends all four
+attempts on 26–29 September while the account is empty and the cycle is
+cancelled; fourshots spends one, waits, and clears on 4 October with two
+attempts still in hand.](docs/four-attempts.svg)
+
+The documented policy never reads the decline code, so it cannot tell a balance
+shortfall from a dead mandate — and never asks when money might arrive.
+fourshots spreads its attempts across the cycle instead. It holds no belief
+about payday; even spacing means an attempt lands soon after money arrives,
+whenever that is.
+
 ## The problem is not "retry smarter"
 
 Four constraints compose into something more interesting than a retry loop:
@@ -193,6 +204,11 @@ ngrok http 8000                    # point the dashboard at /webhooks/razorpay
 Test mode only. No real funds, no real PII.
 
 ## Layout
+
+[`ARCHITECTURE.md`](ARCHITECTURE.md) covers the boundaries and why each sits
+where it does — the information barrier, how both arms are kept comparable,
+where AI is deliberately absent, and the five things this build got wrong along
+the way.
 
 | module | role |
 |---|---|

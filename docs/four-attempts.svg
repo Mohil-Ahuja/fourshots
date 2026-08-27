@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 575" width="960" height="575"
+     role="img" aria-label="A timeline from 26 September to 25 October. The account balance sits near zero until salary lands on 1 October, then decays through the month. Razorpay's documented policy spends all four attempts on 26, 27, 28 and 29 September, every one while the balance is near zero, and the cycle is cancelled. fourshots spends its first attempt on 26 September, places the second on 4 October after salary has arrived where it clears, and leaves two attempts unspent.">
+
+  <title>Four attempts, and where they go</title>
+
+  <defs>
+    <linearGradient id="bal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#dde5ed" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#dde5ed" stop-opacity="0.2"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Own background and literal colours: GitHub renders an SVG as an image,
+       where CSS custom properties and inherited page colours do not resolve.
+       The figure has to carry its own surface to read on light and dark alike. -->
+  <rect x="0" y="0" width="960" height="575" fill="#f5f7f9"/>
+  <rect x="0.5" y="0.5" width="959" height="574" fill="none" stroke="#d5dce3" stroke-width="1"/>
+
+  <!-- ===================== heading ===================== -->
+  <text x="40" y="44" font-family="Helvetica Neue, Arial, sans-serif" font-size="21"
+        font-weight="700" fill="#101720">Four attempts, and where they go</text>
+  <text x="40" y="68" font-family="Georgia, serif" font-size="13" fill="#5b6875">A &#8377;1,000 mandate due 26 September. The account is empty; salary lands 1 October.</text>
+  <text x="40" y="87" font-family="Georgia, serif" font-size="13" fill="#5b6875">Both policies get the same four attempts, the same NPCI execution windows and the same RBI notice period.</text>
+
+  <!-- ===================== balance ===================== -->
+  <text x="70" y="124" font-family="Courier New, monospace" font-size="11"
+        letter-spacing="1.2" fill="#5b6875">ACCOUNT BALANCE</text>
+
+  <line x1="70" y1="206" x2="882" y2="206" stroke="#c3ccd6" stroke-width="1" stroke-dasharray="3 4"/>
+  <text x="888" y="203" font-family="Courier New, monospace" font-size="10" fill="#5b6875">amount</text>
+  <text x="888" y="215" font-family="Courier New, monospace" font-size="10" fill="#5b6875">due</text>
+
+  <path d="M 70,251 L 98,252 L 126,253 L 154,253 L 182,254
+           L 210,143 L 238,156 L 266,167 L 294,178 L 322,187 L 350,195
+           L 378,203 L 406,209 L 434,215 L 462,221 L 490,226 L 518,230
+           L 546,234 L 574,237 L 602,240 L 630,243 L 658,245 L 686,247
+           L 714,249 L 742,250 L 770,252 L 798,253 L 826,254 L 854,255 L 882,255
+           L 882,263 L 70,263 Z"
+        fill="url(#bal)" stroke="none"/>
+  <polyline points="70,251 98,252 126,253 154,253 182,254 210,143 238,156 266,167
+                    294,178 322,187 350,195 378,203 406,209 434,215 462,221
+                    490,226 518,230 546,234 574,237 602,240 630,243 658,245
+                    686,247 714,249 742,250 770,252 798,253 826,254 854,255 882,255"
+            fill="none" stroke="#9fb4c6" stroke-width="2"/>
+
+  <line x1="210" y1="133" x2="210" y2="510" stroke="#0b6e5f" stroke-width="1.5"
+        stroke-dasharray="5 4" opacity="0.7"/>
+  <text x="216" y="140" font-family="Courier New, monospace" font-size="11"
+        font-weight="bold" fill="#0b6e5f">SALARY CREDITED &#8212; 1 OCT</text>
+
+  <!-- ============ row 1: Razorpay documented default ============ -->
+  <text x="70" y="302" font-family="Helvetica Neue, Arial, sans-serif" font-size="14"
+        font-weight="600" fill="#101720">Razorpay documented default</text>
+  <text x="70" y="320" font-family="Courier New, monospace" font-size="11" fill="#5b6875">&#8220;retry the payment on the following day&#8221;</text>
+
+  <line x1="70" y1="352" x2="882" y2="352" stroke="#d5dce3" stroke-width="1"/>
+
+  <circle cx="70"  cy="352" r="9" fill="#a8442c"/>
+  <circle cx="98"  cy="352" r="9" fill="#a8442c"/>
+  <circle cx="126" cy="352" r="9" fill="#a8442c"/>
+  <circle cx="154" cy="352" r="9" fill="#a8442c"/>
+  <g font-family="Courier New, monospace" font-size="10" font-weight="bold"
+     fill="#ffffff" text-anchor="middle">
+    <text x="70"  y="356">1</text>
+    <text x="98"  y="356">2</text>
+    <text x="126" y="356">3</text>
+    <text x="154" y="356">4</text>
+  </g>
+
+  <path d="M 70,371 L 70,378 L 154,378 L 154,371" fill="none" stroke="#a8442c" stroke-width="1.5"/>
+  <text x="112" y="394" font-family="Courier New, monospace" font-size="11"
+        fill="#a8442c" text-anchor="middle">all four spent on an empty account</text>
+
+  <rect x="178" y="340" width="152" height="24" rx="3" fill="#f0ddd7" stroke="#a8442c" stroke-width="1"/>
+  <text x="254" y="356" font-family="Courier New, monospace" font-size="11"
+        font-weight="bold" fill="#a8442c" text-anchor="middle">CYCLE CANCELLED</text>
+
+  <!-- ===================== row 2: fourshots ===================== -->
+  <text x="70" y="432" font-family="Helvetica Neue, Arial, sans-serif" font-size="14"
+        font-weight="600" fill="#101720">fourshots</text>
+  <text x="70" y="450" font-family="Courier New, monospace" font-size="11" fill="#5b6875">spread across the cycle &#8212; no payday guess required</text>
+
+  <text x="294" y="472" font-family="Courier New, monospace" font-size="11"
+        font-weight="bold" fill="#0b6e5f" text-anchor="middle">CLEARED &#8212; 4 OCT</text>
+  <line x1="294" y1="478" x2="294" y2="486" stroke="#0b6e5f" stroke-width="1.5"/>
+
+  <line x1="70" y1="500" x2="882" y2="500" stroke="#d5dce3" stroke-width="1"/>
+
+  <circle cx="70" cy="500" r="9" fill="#a8442c"/>
+  <text x="70" y="504" font-family="Courier New, monospace" font-size="10"
+        font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+
+  <circle cx="294" cy="500" r="12" fill="#0b6e5f"/>
+  <text x="294" y="504" font-family="Courier New, monospace" font-size="10"
+        font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+
+  <circle cx="518" cy="500" r="9" fill="none" stroke="#c3ccd6" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <circle cx="770" cy="500" r="9" fill="none" stroke="#c3ccd6" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <path d="M 518,519 L 518,526 L 770,526 L 770,519" fill="none" stroke="#c3ccd6" stroke-width="1.5"/>
+  <text x="644" y="542" font-family="Courier New, monospace" font-size="11"
+        fill="#5b6875" text-anchor="middle">two attempts never spent</text>
+
+  <!-- ===================== date axis ===================== -->
+  <g font-family="Courier New, monospace" font-size="10" fill="#5b6875" text-anchor="middle">
+    <text x="70"  y="566">26 SEP</text>
+    <text x="210" y="566">1 OCT</text>
+    <text x="350" y="566">6 OCT</text>
+    <text x="490" y="566">11 OCT</text>
+    <text x="630" y="566">16 OCT</text>
+    <text x="770" y="566">21 OCT</text>
+  </g>
+</svg>
