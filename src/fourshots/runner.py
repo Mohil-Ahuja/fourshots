@@ -23,7 +23,7 @@ can be replayed and checked afterwards rather than taken on trust.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from decimal import Decimal
 
 from fourshots.audit import AuditLog

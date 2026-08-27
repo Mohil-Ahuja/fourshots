@@ -79,6 +79,22 @@ attempt *N+1*.
 regulator-capped budget. Attempts spent on debits that could never clear fall
 from 1,508 to 453.
 
+### Across 20 independent cohorts
+
+One seed cannot distinguish a real effect from a favourable draw, so the
+parameter file declares 20 replications. `--replicate` runs them:
+
+| | mean | min | max |
+|---|---|---|---|
+| baseline recovered | ₹54,18,881 | ₹43,78,967 | ₹61,75,896 |
+| fourshots recovered | ₹75,03,378 | ₹61,93,192 | ₹84,42,044 |
+| **advantage** | **+38.8%** | +28.0% | +54.1% |
+
+**The engine is ahead in 20 of 20 replications.** Note that the single
+pre-registered seed above (+49.2%) sits on the *favourable* side of that
+distribution — the mean is the number to argue from, and the 20-of-20 is the
+claim that actually settles it.
+
 ### Where it is worse
 
 The headline is a net figure, and net figures hide things. Two costs are real,
@@ -130,6 +146,18 @@ suite rather than quietly invalidating the benchmark.
 history. Every parameter declares its provenance, and most are marked `assumed`
 with reasoning rather than dressed up with an invented citation; no primary
 source publishes a decline-reason breakdown for failed recurring debits.
+
+**The assumptions are swept, including the one that hurts.** The parameter file
+names the balance share as what the headline is most exposed to, and sweeping
+it across the declared 0.35–0.75 range shows exactly that:
+
+| balance share | 0.35 | 0.45 | **0.55** | 0.65 | 0.75 |
+|---|---|---|---|---|---|
+| advantage | **+8.0%** | +20.3% | **+49.2%** | +54.7% | +65.8% |
+
+At the low end the advantage falls to +8.0%. The engine still wins everywhere
+in the range, but the size of the win depends substantially on balance failures
+being the dominant mode — which is an assumption, and is labelled as one.
 
 **The tests bite.** `python tools/mutation_audit.py` introduces twelve
 deliberate defects — regulatory constants that no longer match the circulars,
@@ -188,7 +216,7 @@ would never have produced that code.
 ```bash
 pip install -e ".[dev]"
 
-pytest -q                          # 216 tests
+pytest -q                          # 243 tests
 python tools/mutation_audit.py     # 12/12 mutations caught
 python -m fourshots.benchmark      # reproduce the headline table
 ```

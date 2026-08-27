@@ -13,17 +13,10 @@ which is what lets the suite run offline and in CI without credentials.
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-import pytest
-
 from fourshots.engine import ConstraintAwareEngine
 from fourshots.policy import IST, MandatePurpose, PRE_DEBIT_NOTICE, is_in_execution_window
 from fourshots.simulator import DeclineRecord, Observation
-from fourshots.taxonomy import (
-    INSUFFICIENT_BALANCE,
-    MANDATE_DEAD,
-    UNCLASSIFIED,
-    classify,
-)
+from fourshots.taxonomy import INSUFFICIENT_BALANCE, MANDATE_DEAD
 from fourshots.triage import (
     CachedTriager,
     ClaudeTriager,

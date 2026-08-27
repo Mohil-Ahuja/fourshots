@@ -143,3 +143,97 @@ def test_cli_entrypoint_runs(params, capsys, monkeypatch) -> None:
     assert main() == 0
     out = capsys.readouterr().out
     assert "BASELINE" in out and "worst case" in out.lower()
+
+
+# --- Replications ----------------------------------------------------------
+#
+# The parameter file declares 20 independent replications and says the result
+# should be a distribution rather than one lucky draw. For a while it declared
+# that and the code ran a single cohort -- a promise the build did not keep,
+# and exactly the kind of thing a reader checking cohort.yaml against the
+# results would catch.
+
+def test_replications_use_distinct_derived_seeds(params) -> None:
+    """Distinct so the cohorts differ; derived so the whole set reproduces."""
+    from fourshots.benchmark import replicate
+    from fourshots.engine import ConstraintAwareEngine
+
+    results = replicate(ConstraintAwareEngine(), params, trials=4)
+    assert len(results) == 4
+    recovered = [r.recovered_value for r in results]
+    assert len(set(recovered)) > 1, "replications produced identical cohorts"
+
+
+def test_replications_are_reproducible(params) -> None:
+    from fourshots.benchmark import replicate
+    from fourshots.engine import ConstraintAwareEngine
+
+    first = [r.recovered_value for r in replicate(ConstraintAwareEngine(), params, 3)]
+    second = [r.recovered_value for r in replicate(ConstraintAwareEngine(), params, 3)]
+    assert first == second
+
+
+def test_engine_wins_every_replication(params) -> None:
+    """The claim the headline actually rests on. A mean advantage with losing
+    replications underneath it would be a much weaker result, and worth
+    reporting differently."""
+    from fourshots.benchmark import replicate
+    from fourshots.engine import ConstraintAwareEngine
+
+    trials = 8  # a subset; the full declared set runs in the benchmark
+    baselines = replicate(RazorpayDefault(params.baseline_offsets_days), params, trials)
+    engines = replicate(ConstraintAwareEngine(), params, trials)
+
+    for i, (baseline, engine) in enumerate(zip(baselines, engines)):
+        assert engine.recovered_value > baseline.recovered_value, (
+            f"engine lost replication {i}"
+        )
+
+
+def test_the_declared_trial_count_is_actually_used(params, capsys) -> None:
+    """Guards the specific defect this section exists for: cohort.yaml
+    promising replications the code never ran."""
+    from fourshots.benchmark import print_replications
+
+    print_replications(params)
+    out = capsys.readouterr().out
+    assert f"of {params.trials} replications" in out
+
+
+# --- Decline-mix sensitivity ----------------------------------------------
+
+def test_rescaling_the_balance_share_keeps_the_mix_normalised(params) -> None:
+    from fourshots.benchmark import _rescale_decline_mix
+
+    for share in (0.35, 0.55, 0.75):
+        mix = _rescale_decline_mix(params, share).decline_mix
+        assert sum(mix.values()) == pytest.approx(1.0)
+        assert mix["insufficient_balance"] == pytest.approx(share)
+
+
+def test_rescaling_preserves_relative_weights_of_other_modes(params) -> None:
+    """Moving one parameter must not silently reshape the whole distribution."""
+    from fourshots.benchmark import _rescale_decline_mix
+
+    original = params.decline_mix
+    rescaled = _rescale_decline_mix(params, 0.35).decline_mix
+    ratio_before = original["issuer_down"] / original["psp_transient"]
+    ratio_after = rescaled["issuer_down"] / rescaled["psp_transient"]
+    assert ratio_after == pytest.approx(ratio_before)
+
+
+def test_engine_leads_across_the_declared_sensitivity_range(params) -> None:
+    """cohort.yaml names the balance share as the parameter the headline is
+    most exposed to. If the advantage vanished inside the declared range, the
+    result would be a property of our assumption rather than of the policy."""
+    from fourshots.benchmark import _rescale_decline_mix, run
+    from fourshots.engine import ConstraintAwareEngine
+
+    low, high = params.raw["decline_mix"]["sensitivity"]
+    for share in (low, (low + high) / 2, high):
+        shifted = _rescale_decline_mix(params, share)
+        _, baseline = run(RazorpayDefault(shifted.baseline_offsets_days), shifted)
+        _, engine = run(ConstraintAwareEngine(), shifted)
+        assert engine.recovered_value > baseline.recovered_value, (
+            f"engine lost at balance share {share}"
+        )

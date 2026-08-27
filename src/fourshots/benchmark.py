@@ -37,12 +37,113 @@ DAYS_IN_MONTH_SPACE = 31
 """Day-of-month values run 1..31, so shifts wrap modulo 31, not 30."""
 
 
-def run(policy, params: Params):
+def run(policy, params: Params, seed: int | None = None):
     """Run one arm. Cohort and world are rebuilt from the same seed for each
-    arm, so both face an identical world rather than a shared, drifting one."""
-    rng = random.Random(params.seed)
+    arm, so both face an identical world rather than a shared, drifting one.
+
+    `seed` overrides the pre-registered one for replication runs; both arms of a
+    given replication must be passed the same value or they stop being
+    comparable.
+    """
+    rng = random.Random(params.seed if seed is None else seed)
     cohort = build_cohort(params, rng)
     return cohort, run_cohort(cohort, World(params, rng), policy, MONTH)
+
+
+def replicate(policy, params: Params, trials: int) -> list[RunResult]:
+    """Run `trials` independent cohorts, one per derived seed.
+
+    The parameter file declares 20 replications so the result is a
+    distribution rather than one lucky draw. Seeds are derived from the
+    pre-registered seed rather than drawn randomly, so the whole set is
+    reproducible.
+    """
+    return [run(policy, params, seed=params.seed + i)[1] for i in range(trials)]
+
+
+def print_replications(params: Params) -> None:
+    """Report the headline across independent cohorts, with its spread.
+
+    A single run cannot distinguish a real effect from a favourable draw, and
+    the track bar is explicit that one cherry-picked match proves nothing. This
+    reports the range and the worst replication, and -- the figure that
+    actually settles it -- how many replications the engine won.
+    """
+    trials = params.trials
+    baselines = replicate(RazorpayDefault(params.baseline_offsets_days), params, trials)
+    engines = replicate(ConstraintAwareEngine(), params, trials)
+
+    deltas = [
+        float((e.recovered_value - b.recovered_value) / b.recovered_value)
+        for b, e in zip(baselines, engines)
+    ]
+    wins = sum(1 for d in deltas if d > 0)
+
+    print()
+    print(f"REPLICATIONS -- {trials} independent cohorts, seeds "
+          f"{params.seed}..{params.seed + trials - 1}")
+    print()
+    print(f"{'':22s} {'mean':>12s} {'min':>12s} {'max':>12s}")
+    for label, results in (("baseline recovered", baselines), ("fourshots recovered", engines)):
+        values = [float(r.recovered_value) for r in results]
+        print(f"{label:22s} {_rupees(mean(values)):>12s} {_rupees(min(values)):>12s} "
+              f"{_rupees(max(values)):>12s}")
+    print()
+    print(f"{'advantage':22s} {mean(deltas):>+11.1%} {min(deltas):>+11.1%} {max(deltas):>+11.1%}")
+    print(f"engine ahead in {wins} of {trials} replications.")
+
+
+def _rescale_decline_mix(params: Params, balance_share: float) -> Params:
+    """Set the balance share and renormalise the rest of the mix around it.
+
+    The other proportions keep their relative weights, so this moves one
+    parameter rather than silently reshaping the whole distribution.
+    """
+    document = copy.deepcopy(params.raw)
+    values = document["decline_mix"]["values"]
+    others = {k: v for k, v in values.items() if k != "insufficient_balance"}
+    remaining = 1.0 - balance_share
+    total_others = sum(others.values())
+    rescaled = {k: v / total_others * remaining for k, v in others.items()}
+    document["decline_mix"]["values"] = {
+        "insufficient_balance": balance_share, **rescaled
+    }
+    return Params(document)
+
+
+def print_decline_mix_sweep(params: Params) -> None:
+    """Sweep the balance share across its declared sensitivity range.
+
+    `params/cohort.yaml` names this the parameter the headline is most exposed
+    to, because balance failures are exactly the ones a calendar-blind retry
+    wastes attempts on. If the advantage only survives at our assumed 0.55, the
+    result is a property of that guess rather than of the policy.
+    """
+    low, high = params.raw["decline_mix"]["sensitivity"]
+    steps = [low + (high - low) * i / 4 for i in range(5)]
+
+    print()
+    print(f"DECLINE-MIX SENSITIVITY -- balance share swept {low:.2f} to {high:.2f}")
+    print(f"(pre-registered assumption: "
+          f"{params.decline_mix['insufficient_balance']:.2f})")
+    print()
+    print(f"{'balance share':>14s} {'baseline INR':>14s} {'fourshots INR':>15s} {'delta':>9s}")
+    print("-" * 56)
+
+    worst = None
+    for share in steps:
+        shifted = _rescale_decline_mix(params, share)
+        _, baseline = run(RazorpayDefault(shifted.baseline_offsets_days), shifted)
+        _, engine = run(ConstraintAwareEngine(), shifted)
+        delta = float(
+            (engine.recovered_value - baseline.recovered_value) / baseline.recovered_value
+        )
+        worst = delta if worst is None else min(worst, delta)
+        print(f"{share:>14.2f} {_rupees(baseline.recovered_value):>14s} "
+              f"{_rupees(engine.recovered_value):>15s} {delta:>+8.1%}")
+
+    print("-" * 56)
+    print(f"worst case across the sweep: {worst:+.1%}")
 
 
 def _rupees(value: Decimal | int | float) -> str:
@@ -279,7 +380,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--sweep", action="store_true",
-        help="also run the payday sensitivity sweep",
+        help="also run the payday and decline-mix sensitivity sweeps",
+    )
+    parser.add_argument(
+        "--replicate", action="store_true",
+        help="also run the declared independent replications (slower)",
     )
     args = parser.parse_args()
 
@@ -288,8 +393,11 @@ def main() -> int:
     cohort, _ = run(RazorpayDefault(params.baseline_offsets_days), params)
     print_costs(cohort, baseline, engine)
     print_ai_layer(params)
+    if args.replicate:
+        print_replications(params)
     if args.sweep:
         print_sweep(params)
+        print_decline_mix_sweep(params)
     return 0
 
 

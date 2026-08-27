@@ -8,7 +8,6 @@ wiring between them.
 
 import hmac
 import json
-import os
 from hashlib import sha256
 
 import pytest

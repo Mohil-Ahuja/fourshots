@@ -164,14 +164,16 @@ tidied afterwards. A chain that verifies is the answer.
 
 ## Verification
 
-Four layers, because each catches what the others miss.
+Six layers, because each catches what the others miss.
 
 | Layer | What it establishes | What it cannot |
 |---|---|---|
-| 236 tests | Behaviour matches intent | That the tests assert anything |
+| 243 tests | Behaviour matches intent | That the tests assert anything |
 | 98% coverage | Lines execute | That a bug in them is caught |
 | `tools/mutation_audit.py` | 12 deliberate defects all fail the suite | That untested behaviour exists elsewhere |
 | `tests/test_published_numbers.py` | Prose quotes current figures | That the figures are right |
+| 20 replications | The effect is not one lucky seed | That the cohort model is right |
+| Two sensitivity sweeps | It survives payday and decline-mix assumptions | That other assumptions hold |
 
 The mutation audit is the load-bearing one. A suite at 98% coverage can assert
 almost nothing; introducing real defects — a regulatory constant that no longer
@@ -212,6 +214,13 @@ reached the engine found `customer_absent` and `issuer_down` — 17% of the
 cohort — never arrived. One was silently reclassified by an ambiguous rail
 code; the other cleared on its first attempt unless a rare random outage
 happened to land on the exact debit day.
+
+**Two promises the parameter file made and the code did not keep.**
+`cohort.yaml` declared 20 independent replications and a decline-mix
+sensitivity range, and for a while neither was implemented — the benchmark ran
+a single cohort and swept only payday. Both are now real, and the replications
+changed what can honestly be claimed: the pre-registered seed's +49.2% sits
+above a mean of +38.8%.
 
 **A bug in the measuring instrument.** The sensitivity sweep shifted
 day-of-month values modulo 30 across a 1–31 space, folding day 31 onto day 1

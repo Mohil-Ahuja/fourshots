@@ -11,8 +11,6 @@ differ from the ones being obeyed, and the headline number stops meaning
 anything. `test_params_and_policy_cannot_drift` is the guard.
 """
 
-from decimal import Decimal
-
 import pytest
 import yaml
 

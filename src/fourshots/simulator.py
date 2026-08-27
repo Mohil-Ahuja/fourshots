@@ -26,12 +26,12 @@ from __future__ import annotations
 
 import enum
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from fourshots.params import Params
-from fourshots.policy import IST, MandatePurpose
+from fourshots.policy import MandatePurpose
 
 
 class FailureMode(enum.Enum):
@@ -374,8 +374,10 @@ def build_cohort(params: Params, rng: random.Random) -> list[Mandate]:
         unmappable = drawn == "unclassified"
         mode_name = _weighted_choice(rng, real_modes) if unmappable else drawn
 
+        # The floor is declared in the parameter file rather than assumed here,
+        # so a reader changing it in cohort.yaml actually changes the cohort.
         opening = max(
-            0.0,
+            float(balance_cfg["opening_multiple_of_debit"]["floor"]),
             rng.gauss(
                 float(balance_cfg["opening_multiple_of_debit"]["mean"]),
                 float(balance_cfg["opening_multiple_of_debit"]["sd"]),
