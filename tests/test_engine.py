@@ -215,9 +215,9 @@ def test_engine_never_exceeds_the_attempt_cap(params, engine) -> None:
 
 def test_engine_holds_no_payday_belief() -> None:
     """An earlier version aimed retries at a hardcoded payday prior. The
-    sensitivity sweep showed the advantage collapsed from +41% to +2.2% when
-    the world's payday shifted three days -- it was being told the answer
-    rather than reading the world. Nothing may reintroduce that.
+    sensitivity sweep showed the advantage degraded from around +46% to +11.3%
+    when the world's payday shifted three days -- it was being told the answer
+    more than reading the world. Nothing may reintroduce that.
     """
     import fourshots.engine as engine_module
 

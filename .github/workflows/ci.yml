@@ -1,0 +1,34 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: pip install -e ".[dev]" coverage
+
+      - name: Tests
+        run: coverage run -m pytest -q
+
+      - name: Coverage
+        run: coverage report --include="src/*" --fail-under=95
+
+      # Coverage says lines ran; this says a bug in them would be caught.
+      # Exits non-zero if any deliberate defect survives the suite.
+      - name: Mutation audit
+        run: python tools/mutation_audit.py
+
+      # The README quotes these numbers. If the command cannot produce them,
+      # the README is lying and CI should say so.
+      - name: Reproduce the headline result
+        run: python -m fourshots.benchmark --sweep

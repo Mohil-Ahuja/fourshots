@@ -23,11 +23,11 @@ land near the 1st, with a cluster around the 7th -- and aimed each retry at the
 next plausible payday. It performed well. It was also fragile, and the
 sensitivity sweep is what exposed it: shifting the *world's* payday
 distribution by three days while the prior stayed fixed collapsed the
-advantage from +41% to +2.2%. The engine was not reading the world, it was
-being told the answer.
+advantage from around +46% to +11.3%. The engine was not reading the world so
+much as being told the answer.
 
 Spreading attempts evenly across the cycle instead needs no belief about payday
-at all, and holds up far better: worst case +32.3% against the prior's +2.2%,
+at all, and holds up far better: worst case +44.4% against the prior's +11.3%,
 while matching or beating it at nearly every shift. The reasoning is simple --
 if you do not know when money arrives, maximise the temporal coverage of the
 attempts you have, so that whichever day payday falls on, an attempt lands soon

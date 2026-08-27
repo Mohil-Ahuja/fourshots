@@ -17,25 +17,21 @@ SECRET = "endtoend_test_secret"
 
 
 @pytest.fixture()
-def client(tmp_path, monkeypatch):
+def client(tmp_path):
     """A test client with an isolated audit log.
 
-    `fourshots.app` builds its AuditLog at import time, so the environment has
-    to be set before the module is first imported and the module cache has to
-    be cleared between tests that want separate logs.
+    The app is built by a factory, so each test gets its own log and its own
+    secret by injection. No module-cache clearing, no environment mutation, and
+    no chance of one test's decisions leaking into another's chain.
     """
-    monkeypatch.setenv("RAZORPAY_WEBHOOK_SECRET", SECRET)
-    monkeypatch.setenv("AUDIT_LOG_PATH", str(tmp_path / "audit.jsonl"))
-
-    import sys
-
-    sys.modules.pop("fourshots.app", None)
     from fastapi.testclient import TestClient
 
-    import fourshots.app as app_module
+    from fourshots.app import create_app
+    from fourshots.audit import AuditLog
 
-    yield TestClient(app_module.app), app_module
-    sys.modules.pop("fourshots.app", None)
+    audit = AuditLog(tmp_path / "audit.jsonl")
+    application = create_app(audit=audit, webhook_secret=SECRET)
+    return TestClient(application), audit
 
 
 def post_signed(client, payload: dict, secret: str = SECRET):
@@ -116,19 +112,19 @@ def test_request_signed_with_the_wrong_secret_is_rejected(client) -> None:
 def test_rejected_request_body_is_never_recorded(client) -> None:
     """An unverified payload is attacker-controlled and must not enter the
     decision record -- only the fact of rejection does."""
-    http, module = client
+    http, audit = client
     http.post(
         "/webhooks/razorpay",
         content=json.dumps(decline("insufficient_funds")).encode(),
         headers={"X-Razorpay-Signature": "0" * 64},
     )
-    entries = list(module.audit.read())
+    entries = list(audit.read())
     assert [e.kind for e in entries] == ["webhook_rejected"]
     assert "pay_Test01" not in json.dumps(entries[0].data)
 
 
 def test_decision_lands_in_a_verifiable_chain(client) -> None:
-    http, module = client
+    http, audit = client
     post_signed(http, decline("insufficient_funds"))
     post_signed(http, decline("invalid_vpa"))
 
@@ -140,10 +136,10 @@ def test_decision_lands_in_a_verifiable_chain(client) -> None:
 def test_audit_entry_records_reasoning_and_provenance(client) -> None:
     """The audit trail has to answer 'why', not just 'what' -- including how
     confident the code-to-class mapping was."""
-    http, module = client
+    http, audit = client
     post_signed(http, decline("insufficient_funds"))
 
-    entry = next(iter(module.audit.read()))
+    entry = next(iter(audit.read()))
     assert entry.kind == "decline_observed"
     assert entry.mandate_id == "sub_Test01"
     assert entry.data["failure_class"] == "insufficient_balance"
@@ -154,14 +150,14 @@ def test_audit_entry_records_reasoning_and_provenance(client) -> None:
 
 
 def test_amount_is_recorded_in_rupees_without_precision_loss(client) -> None:
-    http, module = client
+    http, audit = client
     post_signed(http, decline("insufficient_funds", amount=49999))
-    entry = next(iter(module.audit.read()))
+    entry = next(iter(audit.read()))
     assert entry.data["amount_inr"] == "499.99"
 
 
 def test_downtime_event_is_recorded(client) -> None:
-    http, module = client
+    http, audit = client
     post_signed(
         http,
         {
@@ -180,13 +176,13 @@ def test_downtime_event_is_recorded(client) -> None:
             },
         },
     )
-    entry = next(iter(module.audit.read()))
+    entry = next(iter(audit.read()))
     assert entry.kind == "downtime_observed"
     assert entry.data["issuer"] == "HDFC"
 
 
 def test_subscription_halted_is_recorded(client) -> None:
-    http, module = client
+    http, audit = client
     post_signed(
         http,
         {
@@ -199,14 +195,14 @@ def test_subscription_halted_is_recorded(client) -> None:
             },
         },
     )
-    entry = next(iter(module.audit.read()))
+    entry = next(iter(audit.read()))
     assert entry.kind == "subscription_state"
     assert entry.data["state"] == "halted"
 
 
 def test_unmodelled_event_is_still_logged(client) -> None:
     """The log should be a complete account of what the endpoint saw."""
-    http, module = client
+    http, audit = client
     post_signed(http, {"event": "settlement.processed", "payload": {}})
-    entry = next(iter(module.audit.read()))
+    entry = next(iter(audit.read()))
     assert entry.kind == "event_ignored"
