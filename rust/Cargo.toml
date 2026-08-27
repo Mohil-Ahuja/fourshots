@@ -1,0 +1,12 @@
+[package]
+name = "fourshots_rules"
+version = "0.1.0"
+edition = "2021"
+description = "Independent reimplementation of the NPCI/RBI constraint lattice, used as a differential-testing oracle against the Python reference."
+
+[lib]
+name = "fourshots_rules"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pyo3 = { version = "0.23", features = ["extension-module"] }

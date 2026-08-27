@@ -216,7 +216,7 @@ would never have produced that code.
 ```bash
 pip install -e ".[dev]"
 
-pytest -q                          # 243 tests
+pytest -q                          # 254 tests
 python tools/mutation_audit.py     # 12/12 mutations caught
 python -m fourshots.benchmark      # reproduce the headline table
 ```
@@ -230,6 +230,36 @@ ngrok http 8000                    # point the dashboard at /webhooks/razorpay
 ```
 
 Test mode only. No real funds, no real PII.
+
+## The rules are written twice
+
+`policy.py` decides whether a debit against someone's account is permitted at
+all. Everywhere else in this system a bug shows up as a worse number; there it
+shows up as an illegal attempt the benchmark still counts as fine, and no
+aggregate metric would reveal it.
+
+So the constraint lattice is implemented a second time in Rust
+(`rust/src/lib.rs`), written from the circulars rather than from the Python, and
+`tests/test_differential.py` requires the two to return identical answers —
+exhaustively across all 1440 minutes of the day, and across 20,000 randomly
+generated gate cases skewed toward the boundaries where an off-by-one hides.
+
+**The Rust is not on the shipped path.** It is an oracle, not a faster backend:
+the benchmark runs in seconds, so there is no performance problem to solve, and
+swapping implementations by environment would mean behaviour differing
+depending on whether an extension happened to compile. Python remains the only
+execution path; without the toolchain the differential test skips and nothing
+else changes.
+
+```bash
+cd rust && cargo test --lib          # 7 tests, rules stated against the circulars
+maturin build --release
+pip install rust/target/wheels/fourshots_rules-*.whl
+pytest tests/test_differential.py    # 11 tests, the two implementations agree
+```
+
+Two independent implementations agreeing across the whole input space is
+evidence. One implementation passing its own tests is an assertion.
 
 ## Layout
 

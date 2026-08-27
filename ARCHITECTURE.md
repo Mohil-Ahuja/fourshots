@@ -60,14 +60,15 @@ asserted structurally in `tests/test_simulator.py`.
 | `runner.py` | The harness both arms pass through, identically. |
 | `audit.py` | Append-only hash-chained decision log. |
 | `webhook.py`, `app.py` | Live Razorpay ingestion. |
+| `rust/src/lib.rs` | Independent reimplementation of the gate, used as a differential oracle. |
 | `benchmark.py`, `figures.py` | Reproduce and publish the results. |
 | `params.py` | Loads and validates the pre-registered cohort parameters. |
 
 ---
 
-## The five boundaries that matter
+## The six boundaries that matter
 
-Everything else is ordinary code. These five are where a reviewer should push.
+Everything else is ordinary code. These six are where a reviewer should push.
 
 ### 1. Rules are separated from judgement
 
@@ -149,7 +150,28 @@ With no API key the null triager runs and behaviour is identical to before the
 layer existed. **Measured ceiling: +1.76%**, against +49.2% from the
 deterministic work.
 
-### 5. The audit log commits to its own history
+### 5. The regulatory gate is implemented twice
+
+`rust/src/lib.rs` reimplements the constraint lattice from the circulars, and
+`tests/test_differential.py` requires it to agree with the Python exhaustively
+across the day and across 20,000 randomly generated gate cases.
+
+It is an oracle, not a backend. The benchmark runs in seconds, so a faster
+implementation solves nothing, and selecting between implementations at runtime
+would mean behaviour depending on whether an extension compiled on a given
+machine — a real risk bought for no benefit. Python stays the only execution
+path.
+
+The violation names are mapped between the two rather than shared. A common
+constant would let one mistake propagate into both and the test would still
+pass.
+
+What this cannot establish is that both implementations are not wrong in the
+same way — a misread circular produces two agreeing implementations of the
+wrong rule. Agreement narrows the space of errors to misunderstanding rather
+than mistranslation; it does not close it.
+
+### 6. The audit log commits to its own history
 
 Each entry carries the hash of its predecessor, so editing a recorded amount,
 forging an entry's own digest, or splicing an entry out all fail `verify()`.
@@ -164,16 +186,17 @@ tidied afterwards. A chain that verifies is the answer.
 
 ## Verification
 
-Six layers, because each catches what the others miss.
+Seven layers, because each catches what the others miss.
 
 | Layer | What it establishes | What it cannot |
 |---|---|---|
-| 243 tests | Behaviour matches intent | That the tests assert anything |
+| 254 tests | Behaviour matches intent | That the tests assert anything |
 | 98% coverage | Lines execute | That a bug in them is caught |
 | `tools/mutation_audit.py` | 12 deliberate defects all fail the suite | That untested behaviour exists elsewhere |
 | `tests/test_published_numbers.py` | Prose quotes current figures | That the figures are right |
 | 20 replications | The effect is not one lucky seed | That the cohort model is right |
 | Two sensitivity sweeps | It survives payday and decline-mix assumptions | That other assumptions hold |
+| Rust differential oracle | Two independent implementations of the gate agree | That both are not wrong the same way |
 
 The mutation audit is the load-bearing one. A suite at 98% coverage can assert
 almost nothing; introducing real defects — a regulatory constant that no longer
