@@ -28,7 +28,13 @@ jobs:
       - name: Mutation audit
         run: python tools/mutation_audit.py
 
-      # The README quotes these numbers. If the command cannot produce them,
-      # the README is lying and CI should say so.
+      # Reproducing the benchmark proves the code runs. It says nothing about
+      # whether the prose still quotes it correctly -- which is how stale
+      # numbers survived twice. The test suite above covers this
+      # (test_published_numbers.py); this step surfaces it as its own line so
+      # a documentation failure is not mistaken for a code failure.
+      - name: Documents quote current figures
+        run: python -m pytest tests/test_published_numbers.py -q
+
       - name: Reproduce the headline result
         run: python -m fourshots.benchmark --sweep
