@@ -1,0 +1,201 @@
+# Pre-registered cohort parameters.
+#
+# Committed BEFORE any result exists. The git history is the evidence: if these
+# had been tuned until the engine won, the commit ordering would show it.
+#
+# Every parameter carries a `provenance` field, and it is the honest ones that
+# matter most. `documented` means read off a primary source, cited. `assumed`
+# means we chose it, with the reasoning stated and no citation invented. A
+# reader who finds an unsourced number presented as fact would be right to
+# discount everything else in the submission.
+#
+# Parameters marked `assumed` are exactly why the sensitivity sweep exists: the
+# headline claim must survive across their plausible range, not hold at one
+# convenient setting.
+
+meta:
+  version: 1
+  pre_registered: true
+  note: >
+    Committed before the simulator, both policy arms, and all results.
+    Any later change to this file must be a separate commit with a stated
+    reason, so that tuning would be visible rather than silent.
+
+# --- Cohort shape ----------------------------------------------------------
+
+cohort:
+  size: 2000
+  trials: 20                # independent replications; report spread, not one run
+  seed: 20260827            # fixed so any reader reproduces our exact numbers
+  provenance: assumed
+  rationale: >
+    2000 mandates is large enough that per-class recovery rates are not noise
+    and small enough to sweep a parameter grid in reasonable time. 20 trials
+    lets us report reliability across replications rather than a single lucky
+    run.
+
+# --- Failure mix -----------------------------------------------------------
+# Proportions CONDITIONAL ON a debit having failed -- not the overall failure
+# rate. Must sum to 1.0; the loader enforces this.
+
+decline_mix:
+  values:
+    insufficient_balance: 0.55
+    issuer_down: 0.12
+    psp_transient: 0.08
+    mandate_dead: 0.06
+    limit_breach: 0.06
+    customer_absent: 0.05
+    auth_required: 0.04
+    instrument_rejected: 0.02
+    unclassified: 0.02
+  provenance: assumed
+  rationale: >
+    Insufficient balance dominates. That direction is documented -- NPCI and
+    PSP reporting describe low balance as the leading cause of AutoPay debit
+    failure, and UPI AutoPay revocations run at roughly 20 million per month
+    driven by low customer balances (Business Standard, Sept 2025). The
+    specific 0.55 is ours: no primary source publishes a decline-reason
+    breakdown for failed recurring debits.
+    The unclassified share is deliberate. Real rails emit codes the taxonomy
+    has not seen -- confirmed live, when a test-mode payment returned
+    international_transaction_not_allowed and fell through to the conservative
+    default. A cohort with no unmapped codes would flatter us.
+  sensitivity: [0.35, 0.75]
+  sensitivity_note: >
+    The balance share is swept across this range. It is the parameter the
+    headline result is most exposed to, because balance failures are precisely
+    the ones a calendar-blind retry wastes attempts on.
+
+# --- When money arrives ----------------------------------------------------
+# The single highest-leverage signal: a balance failure clears when salary
+# lands, not after a fixed 24 hours.
+
+salary_credit:
+  day_of_month_weights:     # unnormalised; loader normalises
+    1: 0.42
+    2: 0.09
+    3: 0.05
+    7: 0.11
+    10: 0.04
+    28: 0.06
+    29: 0.05
+    30: 0.08
+    31: 0.06
+    other: 0.04
+  provenance: assumed
+  rationale: >
+    Indian payroll concentrates at the start of the month and on the last
+    working day, with a secondary cluster around the 7th. The shape is widely
+    understood but we found no published day-of-month distribution, so these
+    weights are ours.
+  sensitivity_note: >
+    Swept by shifting the whole distribution plus or minus 3 days. If the win
+    survives that shift it does not depend on us having guessed payday
+    correctly, which is the point of testing it.
+
+balance:
+  opening_multiple_of_debit:
+    mean: 2.8
+    sd: 1.6
+    floor: 0.0
+  daily_burn_fraction:
+    mean: 0.11
+    sd: 0.04
+  provenance: assumed
+  rationale: >
+    Balance is modelled as a credit at payday that decays through the month,
+    so a mandate debiting late in the cycle is more likely to find an empty
+    account. Both parameters are ours -- account-level balance trajectories
+    are not public data. The mechanism matters more than the constants, which
+    is why both are swept.
+
+# --- Rail conditions -------------------------------------------------------
+
+issuer_downtime:
+  daily_probability: 0.008
+  mean_duration_hours: 6.0
+  provenance: partially_documented
+  rationale: >
+    NPCI reports system-wide UPI technical decline around 0.7 to 0.8 percent
+    against a target below 1 percent. We use 0.008 as a per-issuer daily outage
+    probability, which is a different quantity from a per-transaction decline
+    rate -- a deliberate reinterpretation, not a citation. Duration is assumed.
+
+# --- Mandate population ----------------------------------------------------
+
+amounts:
+  bands:                    # INR, with weights; straddles the AFA threshold
+    - {min: 99, max: 499, weight: 0.34}
+    - {min: 500, max: 1499, weight: 0.28}
+    - {min: 1500, max: 4999, weight: 0.19}
+    - {min: 5000, max: 14999, weight: 0.12}
+    - {min: 15001, max: 49999, weight: 0.05}
+    - {min: 50000, max: 150000, weight: 0.02}
+  provenance: assumed
+  rationale: >
+    Skewed low to match subscription and EMI reality, but deliberately placing
+    about 7 percent above the INR 15,000 general AFA threshold so the AFA path
+    is actually exercised rather than being dead code that never runs in the
+    benchmark.
+
+purposes:
+  values:
+    general: 0.75
+    mutual_fund_sip: 0.12
+    insurance: 0.08
+    credit_card_bill: 0.05
+  provenance: assumed
+  rationale: >
+    Determines which AFA threshold applies (INR 1,00,000 for SIP, insurance
+    and credit-card bills; INR 15,000 otherwise). The elevated-threshold share
+    is kept meaningful so both branches are tested.
+
+# --- Regulatory constants --------------------------------------------------
+# Not swept. These are rules, not assumptions, and the engine must obey them.
+
+regulatory:
+  max_attempts_per_cycle: 4
+  attempts_provenance: documented
+  attempts_source: >
+    NPCI, Guidelines on usage of UPI and API -- one original execution plus
+    three retries per mandate, in force 2025-08-01.
+  attempts_caveat: >
+    Whether the cap is per execution cycle or per mandate lifetime is an open
+    verification item (see DECISIONS.md). The mandates_saved metric depends
+    on it.
+
+  peak_windows_ist:
+    - ["10:00", "13:00"]
+    - ["17:00", "21:30"]
+  windows_provenance: documented
+  windows_source: >
+    NPCI -- AutoPay mandates execute only outside UPI peak hours, enforced
+    from 2025-08-01.
+
+  pre_debit_notice_hours: 24
+  afa_threshold_general_inr: 15000
+  afa_threshold_elevated_inr: 100000
+  afa_provenance: documented
+  afa_source: >
+    RBI, Digital Payments -- E-mandate Framework, 2026, notified 2026-04-21.
+    24-hour pre-transaction notification with per-transaction opt-out; AFA
+    above INR 15,000, and above INR 1,00,000 for insurance, SIP and
+    credit-card bill mandates.
+
+# --- Baseline arm ----------------------------------------------------------
+
+baseline:
+  policy: razorpay_documented_default
+  retry_offsets_days: [1, 2, 3]
+  varies_by_failure_reason: false
+  provenance: documented
+  source: >
+    Razorpay Subscriptions docs, Payment Retries: "We automatically retry the
+    payment on the following day." The documentation states no variation by
+    failure reason and exposes no merchant configurability.
+  note: >
+    The control arm is a real, quotable, shipped policy rather than a strawman
+    we invented. It passes through the same legality gate as the engine arm,
+    so any attempt it proposes that violates NPCI or RBI rules is blocked
+    identically -- it is not being held to an easier or harder standard.
