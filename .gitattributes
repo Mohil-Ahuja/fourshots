@@ -1,0 +1,6 @@
+# Normalise line endings so the repo behaves identically on every machine.
+# Without this, a Windows checkout rewrites LF as CRLF and byte-level tooling
+# (see tools/mutation_audit.py) silently fails to match multi-line patterns.
+* text=auto eol=lf
+*.png binary
+*.jpg binary

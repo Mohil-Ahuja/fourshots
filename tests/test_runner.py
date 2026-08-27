@@ -228,3 +228,72 @@ def test_audit_log_of_a_run_verifies(params, baseline, tmp_path) -> None:
     run_cohort(cohort, World(params, rng), baseline, MONTH, audit)
 
     assert audit.verify() > 0
+
+
+# --- mandates_saved must not flatter a policy ------------------------------
+#
+# Added after mutation testing: reverting the repairability check went
+# undetected by the whole suite. That is the metric most exposed to challenge,
+# so it now has teeth.
+
+def _stopped(repairable: bool):
+    from fourshots.runner import CycleResult
+
+    return CycleResult(
+        mandate_id="mand_test",
+        amount=Decimal("1000"),
+        outcome=Outcome.STOPPED_EARLY,
+        attempts_used=1,
+        recovered_at=None,
+        repairable=repairable,
+    )
+
+
+def test_stopping_early_on_a_repairable_mandate_saves_it() -> None:
+    """An expired card or a breached limit can be re-authorised by the
+    customer, so escalating instead of burning attempts keeps them."""
+    assert _stopped(repairable=True).mandate_survived
+
+
+def test_stopping_early_on_a_dead_mandate_does_not_save_it() -> None:
+    """A VPA that no longer resolves cannot be repaired. Stopping early is
+    still correct -- it saves three wasted attempts -- but it does not save a
+    customer, and counting it as though it did would inflate the headline."""
+    assert not _stopped(repairable=False).mandate_survived
+
+
+def test_recovery_counts_as_saved_regardless_of_repairability() -> None:
+    """A debit that cleared is a live mandate by definition."""
+    from fourshots.runner import CycleResult
+
+    assert CycleResult(
+        "mand_test", Decimal("1000"), Outcome.RECOVERED, 1,
+        datetime(2026, 9, 27, 8, 0, tzinfo=IST), repairable=False,
+    ).mandate_survived
+
+
+def test_budget_exhaustion_is_never_a_saved_mandate() -> None:
+    from fourshots.runner import CycleResult
+
+    for repairable in (True, False):
+        assert not CycleResult(
+            "mand_test", Decimal("1000"), Outcome.BUDGET_EXHAUSTED,
+            MAX_ATTEMPTS_PER_CYCLE, None, repairable=repairable,
+        ).mandate_survived
+
+
+def test_engine_saved_count_excludes_unrepairable_early_stops(params) -> None:
+    """End-to-end guard on the headline number itself."""
+    from fourshots.engine import ConstraintAwareEngine
+
+    rng = random.Random(params.seed)
+    cohort = build_cohort(params, rng)
+    result = run_cohort(cohort, World(params, rng), ConstraintAwareEngine(), MONTH)
+
+    generous = sum(
+        1 for c in result.cycles
+        if c.outcome in (Outcome.RECOVERED, Outcome.STOPPED_EARLY)
+    )
+    assert result.mandates_saved < generous, (
+        "mandates_saved must be stricter than counting every early stop"
+    )
