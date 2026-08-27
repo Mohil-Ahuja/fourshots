@@ -58,11 +58,11 @@ attempt *N+1*.
 
 | | Razorpay documented default | fourshots | delta |
 |---|---|---|---|
-| recovery rate | 44.0% | **62.9%** | +42.8% |
-| recovered | ₹49,72,579 | **₹75,28,138** | +51.4% |
-| mandates saved | 881 | **1,600** | +81.6% |
-| attempts spent | 5,842 | **4,058** | −30.5% |
-| attempts per recovery | 6.63 | **3.23** | −51.4% |
+| recovery rate | 44.1% | **62.8%** | +42.4% |
+| recovered | ₹49,85,233 | **₹74,39,249** | +49.2% |
+| mandates saved | 883 | **1,601** | +81.3% |
+| attempts spent | 5,857 | **4,057** | −30.7% |
+| attempts per recovery | 6.63 | **3.23** | −51.3% |
 
 **More money and more mandates from 30% fewer attempts**, on the same
 regulator-capped budget. Attempts spent on debits that could never clear fall
@@ -87,10 +87,10 @@ A merchant feels that as delayed cash even when the total is higher. Whether
 — but it should be made with the number in view.
 
 **Mandate-level regressions.** Aggregate improvement is compatible with
-individual losses. **76 mandates worth ₹2,26,020 were recovered by the baseline
+individual losses. **78 mandates worth ₹3,29,169 were recovered by the baseline
 and not by the engine** — mostly customer-absent declines, where the engine
 escalates to a person while the baseline retries blindly and sometimes gets
-lucky. Against ₹27,81,579 gained on 453 mandates, a 12.3x ratio. Worth taking,
+lucky. Against ₹27,83,185 gained on 452 mandates, an 8.5x ratio. Worth taking,
 and still a real loss.
 
 Reproduce with `python -m fourshots.benchmark` (see below). The seed is fixed,
@@ -133,9 +133,9 @@ Both are in the git history, and both matter more than the headline.
 **The sensitivity sweep killed our first engine.** It held a prior about Indian
 payroll and aimed each balance retry at the next plausible payday. It scored
 +41%. Then shifting the *world's* payday distribution three days while the
-prior stayed fixed degraded the advantage to **+8.7%** — the engine was being
+prior stayed fixed degraded the advantage to **+9.9%** — the engine was being
 told the answer more than reading the world. Spreading attempts evenly across
-the cycle needs no payday belief at all and holds at **+46.5% worst case**. The
+the cycle needs no payday belief at all and holds at **+46.9% worst case**. The
 offsets are even thirds of a ~30-day cycle, derived from the cycle length
 rather than fitted to the cohort.
 

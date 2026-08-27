@@ -1,0 +1,664 @@
+<title>Four Attempts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;800&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+  :root {
+    --ground: #f5f7f9;
+    --surface: #ffffff;
+    --sunken: #eceff3;
+    --ink: #101720;
+    --muted: #5b6875;
+    --faint: #d5dce3;
+    --rule: #c3ccd6;
+    --recovered: #0b6e5f;
+    --recovered-soft: #d4e8e3;
+    --wasted: #a8442c;
+    --wasted-soft: #f0ddd7;
+    --balance: #9fb4c6;
+    --balance-fill: #dde5ed;
+
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0d1117;
+      --surface: #161c24;
+      --sunken: #11171e;
+      --ink: #e4e9ef;
+      --muted: #8a97a6;
+      --faint: #263039;
+      --rule: #2e3945;
+      --recovered: #3fbfa6;
+      --recovered-soft: #17342f;
+      --wasted: #d97b5f;
+      --wasted-soft: #34211b;
+      --balance: #46586a;
+      --balance-fill: #1b2530;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0d1117;
+    --surface: #161c24;
+    --sunken: #11171e;
+    --ink: #e4e9ef;
+    --muted: #8a97a6;
+    --faint: #263039;
+    --rule: #2e3945;
+    --recovered: #3fbfa6;
+    --recovered-soft: #17342f;
+    --wasted: #d97b5f;
+    --wasted-soft: #34211b;
+    --balance: #46586a;
+    --balance-fill: #1b2530;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: clamp(2.5rem, 6vw, 5rem) clamp(1.25rem, 4vw, 2.5rem) 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(3rem, 6vw, 4.5rem);
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 0.9rem;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(2.6rem, 7vw, 4.2rem);
+    line-height: 0.98;
+    letter-spacing: -0.03em;
+    margin: 0 0 1.1rem;
+    text-wrap: balance;
+  }
+
+  h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.35rem, 3vw, 1.7rem);
+    letter-spacing: -0.015em;
+    margin: 0 0 0.4rem;
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.02rem;
+    letter-spacing: -0.005em;
+    margin: 0 0 0.5rem;
+  }
+
+  .lede {
+    font-size: clamp(1.08rem, 2.2vw, 1.28rem);
+    color: var(--muted);
+    max-width: 62ch;
+    margin: 0;
+  }
+
+  section > p, section > ul { max-width: 68ch; }
+  p { margin: 0 0 1rem; }
+  p:last-child { margin-bottom: 0; }
+
+  .section-intro { color: var(--muted); margin-bottom: 1.6rem; max-width: 68ch; }
+
+  strong { font-weight: 600; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--sunken);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+
+  hr.rule {
+    border: 0;
+    border-top: 1px solid var(--rule);
+    margin: 0;
+  }
+
+  /* --- figure --- */
+  figure {
+    margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--faint);
+    border-radius: 4px;
+    padding: clamp(1rem, 3vw, 1.75rem);
+    overflow-x: auto;
+  }
+  figure svg { width: 100%; min-width: 720px; height: auto; display: block; }
+  figcaption {
+    font-size: 0.92rem;
+    color: var(--muted);
+    margin-top: 1.1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--faint);
+    max-width: 74ch;
+  }
+
+  /* --- tables --- */
+  .table-scroll { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+  }
+  th, td {
+    text-align: right;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--faint);
+    font-variant-numeric: tabular-nums;
+  }
+  th:first-child, td:first-child { text-align: left; font-variant-numeric: normal; }
+  thead th {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    border-bottom-color: var(--rule);
+  }
+  tbody td { font-family: var(--mono); }
+  tbody td:first-child { font-family: var(--body); }
+  .win { color: var(--recovered); font-weight: 500; }
+  .cost { color: var(--wasted); font-weight: 500; }
+  tfoot td {
+    border-bottom: 0;
+    padding-top: 0.9rem;
+    font-family: var(--body);
+    font-size: 0.88rem;
+    color: var(--muted);
+    text-align: left;
+  }
+
+  /* --- callouts --- */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1px;
+    background: var(--faint);
+    border: 1px solid var(--faint);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .stat { background: var(--surface); padding: 1.15rem 1.25rem; }
+  .stat .k {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 0.45rem;
+  }
+  .stat .v {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 1.75rem;
+    letter-spacing: -0.02em;
+    display: block;
+    line-height: 1.1;
+  }
+  .stat .sub { font-size: 0.85rem; color: var(--muted); }
+
+  .note {
+    border-left: 2px solid var(--rule);
+    padding: 0.15rem 0 0.15rem 1.15rem;
+    color: var(--muted);
+    font-size: 0.95rem;
+    max-width: 68ch;
+  }
+  .note strong { color: var(--ink); }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin-bottom: 1.1rem;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 0.45rem; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot.f { background: var(--wasted); }
+  .dot.r { background: var(--recovered); }
+  .dot.u { background: transparent; border: 1.5px dashed var(--rule); }
+
+  footer {
+    font-size: 0.88rem;
+    color: var(--muted);
+    border-top: 1px solid var(--rule);
+    padding-top: 1.5rem;
+  }
+  footer a { color: var(--recovered); }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Razorpay AI Buildathon 2026 &middot; Track 03</p>
+    <h1>Four attempts, and where they go</h1>
+    <p class="lede">
+      NPCI allows exactly four executions per mandate cycle. Razorpay's documented
+      retry policy spends them on consecutive days &mdash; which, for a debit that
+      failed because the account was empty, means spending all four before payday.
+    </p>
+  </header>
+
+  <hr class="rule">
+
+  <section>
+    <h2>The whole argument, in one picture</h2>
+    <p class="section-intro">
+      A &#8377;1,000 mandate due on 26 September. The account is empty; salary lands
+      on 1 October. Both policies get the same four attempts and obey the same NPCI
+      execution windows and RBI notice period.
+    </p>
+
+    <div class="legend">
+      <span><i class="dot f"></i> attempt failed</span>
+      <span><i class="dot r"></i> attempt cleared</span>
+      <span><i class="dot u"></i> attempt never spent</span>
+    </div>
+
+    <figure>
+      <svg viewBox="0 0 960 470" role="img"
+           aria-label="A timeline from 26 September to 25 October. The account balance is near zero until salary lands on 1 October, then decays through the month. The documented policy spends all four attempts on 26, 27, 28 and 29 September, every one while the balance is near zero, and the cycle is cancelled. The constraint-aware engine spends its first attempt on 26 September, then places the second on 4 October after salary has arrived, where it clears, leaving two attempts unspent.">
+
+        <defs>
+          <linearGradient id="balGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--balance-fill)" stop-opacity="1"/>
+            <stop offset="100%" stop-color="var(--balance-fill)" stop-opacity="0.25"/>
+          </linearGradient>
+        </defs>
+
+        <!-- balance panel -->
+        <text x="70" y="30" font-family="IBM Plex Mono, monospace" font-size="11"
+              letter-spacing="1.2" fill="var(--muted)">ACCOUNT BALANCE</text>
+
+        <!-- amount-due reference line: balance must reach this for a debit to clear -->
+        <line x1="70" y1="118" x2="882" y2="118" stroke="var(--rule)"
+              stroke-width="1" stroke-dasharray="3 4"/>
+        <text x="888" y="115" font-family="IBM Plex Mono, monospace" font-size="10"
+              fill="var(--muted)">amount</text>
+        <text x="888" y="127" font-family="IBM Plex Mono, monospace" font-size="10"
+              fill="var(--muted)">due</text>
+
+        <!-- balance area: flat-empty to 30 Sep, jump at payday, decay after -->
+        <path d="M 70,163 L 98,164 L 126,165 L 154,165 L 182,166
+                 L 210,55 L 238,68 L 266,79 L 294,90 L 322,99 L 350,107
+                 L 378,115 L 406,121 L 434,127 L 462,133 L 490,138 L 518,142
+                 L 546,146 L 574,149 L 602,152 L 630,155 L 658,157 L 686,159
+                 L 714,161 L 742,162 L 770,164 L 798,165 L 826,166 L 854,167 L 882,167
+                 L 882,175 L 70,175 Z"
+              fill="url(#balGrad)" stroke="none"/>
+        <polyline points="70,163 98,164 126,165 154,165 182,166 210,55 238,68 266,79
+                          294,90 322,99 350,107 378,115 406,121 434,127 462,133
+                          490,138 518,142 546,146 574,149 602,152 630,155 658,157
+                          686,159 714,161 742,162 770,164 798,165 826,166 854,167 882,167"
+                  fill="none" stroke="var(--balance)" stroke-width="2"/>
+
+        <!-- payday marker -->
+        <line x1="210" y1="45" x2="210" y2="410" stroke="var(--recovered)"
+              stroke-width="1.5" stroke-dasharray="5 4" opacity="0.75"/>
+        <text x="216" y="52" font-family="IBM Plex Mono, monospace" font-size="11"
+              font-weight="500" fill="var(--recovered)">SALARY CREDITED &mdash; 1 OCT</text>
+
+        <!-- ============ row 1: documented default ============ -->
+        <text x="70" y="212" font-family="Archivo, sans-serif" font-size="14"
+              font-weight="600" fill="currentColor">Razorpay documented default</text>
+        <text x="70" y="230" font-family="IBM Plex Mono, monospace" font-size="11"
+              fill="var(--muted)">&#8220;retry the payment on the following day&#8221;</text>
+
+        <line x1="70" y1="262" x2="882" y2="262" stroke="var(--faint)" stroke-width="1"/>
+
+        <g fill="var(--wasted)">
+          <circle cx="70"  cy="262" r="9"/>
+          <circle cx="98"  cy="262" r="9"/>
+          <circle cx="126" cy="262" r="9"/>
+          <circle cx="154" cy="262" r="9"/>
+        </g>
+        <g font-family="IBM Plex Mono, monospace" font-size="10" font-weight="500"
+           fill="var(--surface)" text-anchor="middle">
+          <text x="70"  y="266">1</text>
+          <text x="98"  y="266">2</text>
+          <text x="126" y="266">3</text>
+          <text x="154" y="266">4</text>
+        </g>
+
+        <!-- brace over the four wasted attempts -->
+        <path d="M 70,281 L 70,288 L 154,288 L 154,281" fill="none"
+              stroke="var(--wasted)" stroke-width="1.5"/>
+        <text x="112" y="304" font-family="IBM Plex Mono, monospace" font-size="11"
+              fill="var(--wasted)" text-anchor="middle">all four spent on an empty account</text>
+
+        <rect x="176" y="250" width="152" height="24" rx="3"
+              fill="var(--wasted-soft)" stroke="var(--wasted)" stroke-width="1"/>
+        <text x="252" y="266" font-family="IBM Plex Mono, monospace" font-size="11"
+              font-weight="500" fill="var(--wasted)" text-anchor="middle">CYCLE CANCELLED</text>
+
+        <!-- ============ row 2: fourshots ============ -->
+        <text x="70" y="348" font-family="Archivo, sans-serif" font-size="14"
+              font-weight="600" fill="currentColor">fourshots</text>
+        <text x="70" y="366" font-family="IBM Plex Mono, monospace" font-size="11"
+              fill="var(--muted)">spread across the cycle &mdash; no payday guess required</text>
+
+        <line x1="70" y1="398" x2="882" y2="398" stroke="var(--faint)" stroke-width="1"/>
+
+        <!-- attempt 1: fails, same day as baseline -->
+        <circle cx="70" cy="398" r="9" fill="var(--wasted)"/>
+        <text x="70" y="402" font-family="IBM Plex Mono, monospace" font-size="10"
+              font-weight="500" fill="var(--surface)" text-anchor="middle">1</text>
+
+        <!-- attempt 2: clears, 4 Oct, after payday -->
+        <circle cx="294" cy="398" r="12" fill="var(--recovered)"/>
+        <text x="294" y="402" font-family="IBM Plex Mono, monospace" font-size="10"
+              font-weight="500" fill="var(--surface)" text-anchor="middle">2</text>
+        <path d="M 294,376 L 294,368" stroke="var(--recovered)" stroke-width="1.5"/>
+        <text x="294" y="360" font-family="IBM Plex Mono, monospace" font-size="11"
+              font-weight="500" fill="var(--recovered)" text-anchor="middle">CLEARED &mdash; 4 OCT</text>
+
+        <!-- attempts 3 and 4: never needed -->
+        <circle cx="518" cy="398" r="9" fill="none" stroke="var(--rule)"
+                stroke-width="1.5" stroke-dasharray="3 3"/>
+        <circle cx="770" cy="398" r="9" fill="none" stroke="var(--rule)"
+                stroke-width="1.5" stroke-dasharray="3 3"/>
+        <path d="M 518,417 L 518,424 L 770,424 L 770,417" fill="none"
+              stroke="var(--rule)" stroke-width="1.5"/>
+        <text x="644" y="440" font-family="IBM Plex Mono, monospace" font-size="11"
+              fill="var(--muted)" text-anchor="middle">two attempts still in hand</text>
+
+        <!-- ============ date axis ============ -->
+        <g font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--muted)"
+           text-anchor="middle">
+          <text x="70"  y="462">26 SEP</text>
+          <text x="210" y="462">1 OCT</text>
+          <text x="350" y="462">6 OCT</text>
+          <text x="490" y="462">11 OCT</text>
+          <text x="630" y="462">16 OCT</text>
+          <text x="770" y="462">21 OCT</text>
+        </g>
+      </svg>
+
+      <figcaption>
+        The documented policy never reads the decline code, so it cannot know the
+        failure was a balance shortfall rather than a dead mandate &mdash; and never
+        asks when money might arrive. Its four attempts land on 26&ndash;29 September,
+        every one of them on a day the account is provably empty. fourshots spreads
+        its attempts across the cycle instead. It holds no belief about payday; even
+        spacing means an attempt lands soon after money arrives, whenever that is.
+      </figcaption>
+    </figure>
+
+    <p class="note" style="margin-top:1.5rem">
+      This is the mechanical explanation for a documented industry figure:
+      <strong>roughly 20 million UPI AutoPay revocations per month</strong>, driven by
+      low customer balances.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>Across 2,000 mandates</h2>
+    <p class="section-intro">
+      Same cohort, same four-attempt budget, same regulatory gate. Seed
+      <code>20260827</code>, September 2026 &mdash; reproducible with
+      <code>python -m fourshots.benchmark</code>.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Measure</th>
+            <th scope="col">Documented default</th>
+            <th scope="col">fourshots</th>
+            <th scope="col">Change</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Recovery rate</td><td>44.1%</td><td>62.8%</td><td class="win">+42.4%</td></tr>
+          <tr><td>Recovered</td><td>&#8377;49,85,233</td><td>&#8377;74,39,249</td><td class="win">+49.2%</td></tr>
+          <tr><td>Mandates saved</td><td>883</td><td>1,601</td><td class="win">+81.3%</td></tr>
+          <tr><td>Attempts spent</td><td>5,857</td><td>4,057</td><td class="win">&minus;30.7%</td></tr>
+          <tr><td>Attempts per recovery</td><td>6.63</td><td>3.23</td><td class="win">&minus;51.3%</td></tr>
+          <tr><td>Attempts on debits that could never clear</td><td>1,508</td><td>453</td><td class="win">&minus;70.0%</td></tr>
+        </tbody>
+        <tfoot>
+          <tr><td colspan="4">
+            More money and more mandates from 30% fewer attempts. Not a trade-off &mdash;
+            which is what makes it hard to argue with.
+          </td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>Where it is worse</h2>
+    <p class="section-intro">
+      The headline is a net figure, and net figures hide things. The benchmark prints
+      both of these on every run, so the trade-off travels with the result instead of
+      being something a reader has to think to ask for.
+    </p>
+
+    <h3>Cash-flow lag</h3>
+    <p>
+      The engine waits on purpose &mdash; for money to arrive, for an outage to clear
+      &mdash; so recoveries land later. A merchant feels that as delayed cash even when
+      the total is higher.
+    </p>
+
+    <div class="table-scroll" style="margin-bottom:2rem">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Days from due date to recovery</th>
+            <th scope="col">Median</th>
+            <th scope="col">Mean</th>
+            <th scope="col">p90</th>
+            <th scope="col">Max</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Documented default</td><td>0.0</td><td>0.6</td><td>1.0</td><td>3.0</td></tr>
+          <tr><td>fourshots</td><td>1.0</td><td class="cost">6.0</td><td class="cost">16.0</td><td class="cost">25.0</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Mandate-level regressions</h3>
+    <p>
+      Aggregate improvement is compatible with individual losses.
+      <strong>78 mandates worth &#8377;3,29,169 were recovered by the baseline and not
+      by us</strong> &mdash; mostly customer-absent declines, where the engine escalates
+      to a person while the baseline retries blindly and occasionally gets lucky.
+    </p>
+
+    <div class="stat-row">
+      <div class="stat">
+        <span class="k">Lost to regressions</span>
+        <span class="v cost">&#8377;3.3L</span>
+        <span class="sub">78 mandates</span>
+      </div>
+      <div class="stat">
+        <span class="k">Gained</span>
+        <span class="v win">&#8377;27.8L</span>
+        <span class="sub">452 mandates</span>
+      </div>
+      <div class="stat">
+        <span class="k">Ratio</span>
+        <span class="v">8.5&times;</span>
+        <span class="sub">gained to lost</span>
+      </div>
+    </div>
+
+    <p class="note" style="margin-top:1.75rem">
+      Whether &plus;49% recovered is worth a six-day mean delay is the merchant's call,
+      not ours. Our job is to put the number in front of them rather than average it away.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>It does not depend on guessing payday</h2>
+    <p class="section-intro">
+      An earlier version of the engine held a prior about Indian payroll and aimed each
+      retry at the next plausible payday. It scored well &mdash; and collapsed to
+      <span class="num">+9.9%</span> when the world's payday moved three days while the
+      prior stayed fixed. It was being told the answer more than reading the world.
+      Spreading attempts evenly needs no payday belief at all.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Payday shifted by</th>
+            <th scope="col">Baseline recovered</th>
+            <th scope="col">fourshots recovered</th>
+            <th scope="col">Advantage</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>&minus;3 days</td><td>&#8377;50,78,897</td><td>&#8377;74,58,684</td><td class="win">+46.9%</td></tr>
+          <tr><td>&minus;2 days</td><td>&#8377;49,96,512</td><td>&#8377;73,74,419</td><td class="win">+47.6%</td></tr>
+          <tr><td>&minus;1 day</td><td>&#8377;49,68,602</td><td>&#8377;74,83,995</td><td class="win">+50.6%</td></tr>
+          <tr><td>unshifted</td><td>&#8377;49,85,233</td><td>&#8377;74,39,249</td><td class="win">+49.2%</td></tr>
+          <tr><td>+1 day</td><td>&#8377;46,62,931</td><td>&#8377;75,55,668</td><td class="win">+62.0%</td></tr>
+          <tr><td>+2 days</td><td>&#8377;47,99,957</td><td>&#8377;75,36,005</td><td class="win">+57.0%</td></tr>
+          <tr><td>+3 days</td><td>&#8377;48,84,632</td><td>&#8377;76,00,244</td><td class="win">+55.6%</td></tr>
+        </tbody>
+        <tfoot>
+          <tr><td colspan="4">Worst case across the sweep: <span class="num">+46.9%</span>.</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>How much of this is the AI?</h2>
+    <p class="section-intro">About 1.8 percentage points, at the absolute ceiling.</p>
+
+    <p>
+      Scheduling a debit is a money decision. A language model there cannot be tested
+      exhaustively, cannot be audited line by line, and fails by producing a
+      plausible-sounding wrong date &mdash; so attempt accounting, window legality,
+      notice periods and AFA thresholds are all deterministic and hand-checkable.
+    </p>
+    <p>
+      The model does one thing a lookup table cannot: read the prose a rail attaches to
+      a decline code the taxonomy has never seen. It proposes a
+      <strong>classification, never a schedule</strong>, chosen from a closed set; the
+      deterministic engine then does exactly what it always does with that class.
+    </p>
+    <p>
+      We measured its ceiling with an oracle that reads that prose perfectly. Any real
+      model scores at or below it.
+    </p>
+
+    <div class="stat-row">
+      <div class="stat">
+        <span class="k">Deterministic constraint work</span>
+        <span class="v win">+49.2%</span>
+        <span class="sub">recovered vs baseline</span>
+      </div>
+      <div class="stat">
+        <span class="k">AI triage, perfect</span>
+        <span class="v">+1.76%</span>
+        <span class="sub">upper bound, not achieved</span>
+      </div>
+      <div class="stat">
+        <span class="k">Unreadable codes</span>
+        <span class="v">1.9%</span>
+        <span class="sub">of the cohort</span>
+      </div>
+    </div>
+
+    <p class="note" style="margin-top:1.75rem">
+      Inflating that number would have been the easiest claim in this project and the
+      least defensible one.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>What this cannot claim</h2>
+    <ul>
+      <li>
+        <strong>The four-attempt cap may be per cycle or per mandate lifetime.</strong>
+        Sources describe it as per mandate &#8220;identified by each sequence number&#8221;,
+        which reads as per-cycle. The mandates-saved metric depends on that reading and
+        it is not yet confirmed against the primary NPCI circular.
+      </li>
+      <li>
+        <strong>The cohort is synthetic.</strong> No public dataset gives decline-reason
+        breakdowns for Indian recurring debits. Distributions are declared and
+        pre-registered, sourced where possible, marked <em>assumed</em> where not, and
+        swept where they matter.
+      </li>
+      <li>
+        <strong>One execution cycle is simulated, not a subscription lifetime.</strong>
+        Multi-cycle effects &mdash; a saved mandate recovering next month &mdash; are
+        argued, not measured.
+      </li>
+      <li>
+        <strong>Balance is a payday credit decaying monthly.</strong> It reproduces the
+        mechanism that matters, but it is an approximation, not a cash-flow model.
+      </li>
+    </ul>
+  </section>
+
+  <footer>
+    <p>
+      Live Razorpay test-mode webhooks, verified by HMAC signature, classified on arrival,
+      recorded in an append-only hash-chained log. 216 tests, 98% coverage, 12 of 12
+      deliberate defects caught by <code>tools/mutation_audit.py</code>.
+    </p>
+    <p style="margin-bottom:0">
+      Baseline quoted from
+      <a href="https://razorpay.com/docs/payments/subscriptions/payment-retries/">Razorpay's
+      Subscriptions documentation</a>. Attempt cap and execution windows: NPCI, in force
+      1 August 2025. Notice period and AFA thresholds: RBI Digital Payments &mdash;
+      E-mandate Framework, 2026.
+    </p>
+  </footer>
+
+</div>

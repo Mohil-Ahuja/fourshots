@@ -97,9 +97,9 @@ Five minutes. Open on the problem, not the architecture.
 5. **The design we killed.** The first engine aimed each balance retry at a
    hardcoded Indian-payroll prior and scored +41%. The sensitivity sweep
    shifted the world's payday by three days, the prior stayed fixed, and the
-   advantage degraded to +8.7% -- it was being told the answer more than
+   advantage degraded to +9.9% -- it was being told the answer more than
    reading the world. Spreading attempts evenly across the cycle needs no
-   payday belief and holds at +46.5% worst case. Say this out loud in the video: building the
+   payday belief and holds at +46.9% worst case. Say this out loud in the video: building the
    clever version, testing it honestly, and shipping the robust one is the
    whole argument for the methodology.
 6. **The live failure.** A real test-mode payment returned
@@ -118,11 +118,11 @@ Five minutes. Open on the problem, not the architecture.
 
 | | baseline | engine | delta |
 |---|---|---|---|
-| recovery rate | 45.6% | 63.5% | +39.3% |
-| recovered | INR 56.2L | INR 81.3L | +44.8% |
-| mandates saved | 912 | 1,610 | +76.5% |
-| attempts spent | 5,508 | 3,875 | -29.6% |
-| attempts per recovery | 6.04 | 3.05 | -49.5% |
+| recovery rate | 44.1% | 62.8% | +42.4% |
+| recovered | INR 49.9L | INR 74.4L | +49.2% |
+| mandates saved | 883 | 1,601 | +81.3% |
+| attempts spent | 5,857 | 4,057 | -30.7% |
+| attempts per recovery | 6.63 | 3.23 | -51.3% |
 
 More money and more mandates from fewer attempts. Attempts spent on debits
 that could never clear fall from 1,540 to 598.
