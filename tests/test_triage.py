@@ -12,6 +12,7 @@ which is what lets the suite run offline and in CI without credentials.
 
 from datetime import datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 
 from fourshots.engine import ConstraintAwareEngine
 from fourshots.policy import IST, MandatePurpose, PRE_DEBIT_NOTICE, is_in_execution_window
@@ -270,3 +271,56 @@ def test_schema_is_closed() -> None:
     assert set(_RESPONSE_SCHEMA["properties"]["failure_class"]["enum"]) == {
         c.name for c in ALL_CLASSES
     }
+
+
+# --- The documented state of the cache must match the shipped state ---------
+#
+# The README and ARCHITECTURE.md both describe whether a verdict cache ships
+# with this repository. That is a claim about the repository itself, and it is
+# exactly the kind that rots silently: someone populates the cache and commits
+# it, the prose still says none ships, and a judge reading the AI section is
+# told something untrue by a project whose whole argument is that its claims are
+# checked. So it is checked.
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DOCUMENTS_CLAIMING_CACHE_STATE = ("README.md", "ARCHITECTURE.md")
+NO_CACHE_CLAIM = "ships no cache"
+
+
+def test_shipped_cache_state_matches_what_the_docs_claim() -> None:
+    cache_exists = (REPO_ROOT / "params" / "triage_cache.json").exists()
+
+    for document in DOCUMENTS_CLAIMING_CACHE_STATE:
+        text = (REPO_ROOT / document).read_text(encoding="utf-8")
+        claims_none = NO_CACHE_CLAIM in text
+        assert claims_none is not cache_exists, (
+            f"{document} says the repository "
+            f"{'ships no cache' if claims_none else 'ships a cache'}, but "
+            f"params/triage_cache.json {'exists' if cache_exists else 'does not exist'}. "
+            "Either commit the cache and update the prose, or remove it."
+        )
+
+
+def test_the_documented_refresh_command_exists() -> None:
+    """The docs tell a reader to run `python -m fourshots.triage`. If that entry
+    point disappears, the instruction becomes a lie in a file nobody re-reads."""
+    from fourshots import triage as triage_module
+
+    source = Path(triage_module.__file__).read_text(encoding="utf-8")
+    assert 'if __name__ == "__main__"' in source
+    assert callable(triage_module._main)
+
+
+def test_unmappable_codes_are_the_ones_triage_exists_for() -> None:
+    """The refresh command derives its inputs from the cohort rather than a
+    hand-maintained list, so this asserts the derivation actually finds the
+    codes the taxonomy cannot read -- and that none of them is already mapped."""
+    from fourshots.taxonomy import UNCLASSIFIED, classify
+    from fourshots.triage import unmappable_codes
+
+    codes = unmappable_codes()
+    assert codes, "the cohort should produce codes the taxonomy cannot map"
+    for code in codes:
+        assert classify(code).failure_class is UNCLASSIFIED, (
+            f"{code} is mappable; it should not be sent to a model"
+        )

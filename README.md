@@ -165,9 +165,13 @@ compliance checks switched off, signature verification disabled, the engine
 losing its terminal-stop — and requires the suite to fail on each. 12/12 caught.
 Coverage is 98%, but coverage only proves lines ran.
 
-## Two things we got wrong, and how we found out
+## What the checks caught
 
-Both are in the git history, and both matter more than the headline.
+Three defects the verification found before they reached a published number.
+They are listed because each is evidence that a specific check works — a claim
+that cannot be made by asserting the code is correct, only by showing what the
+checks stopped. All are in the git history;
+[`ARCHITECTURE.md`](ARCHITECTURE.md#what-the-checks-caught) has the full six.
 
 **The sensitivity sweep killed our first engine.** It held a prior about Indian
 payroll and aimed each balance retry at the next plausible payday. It scored
@@ -178,7 +182,8 @@ the cycle needs no payday belief at all and holds at **+46.9% worst case**. The
 offsets are even thirds of a ~30-day cycle, derived from the cycle length
 rather than fitted to the cohort.
 
-**A third of the taxonomy was dead code.** `classify()` accepted an NPCI
+**A reachability audit found a third of the taxonomy was dead code.**
+`classify()` accepted an NPCI
 response code with documented mappings for Z9, Z8, U28, U30 and U69. Nothing
 ever passed one. That mattered: Z8 states a breached limit, which is terminal,
 and the engine could not act on it because it never saw it.
@@ -211,12 +216,35 @@ A real test-mode payment is what surfaced our first unmapped code
 conservative class rather than crashing or guessing — and the synthetic cohort
 would never have produced that code.
 
+## The Track 03 bar, clause by clause
+
+Razorpay states the bar for this track as one sentence:
+
+> "Show measured money recovered across a batch, with compliant escalation,
+> stopping rules, and an audit trail."
+
+Each clause is a component rather than a paragraph:
+
+| clause | where it lives | what makes it checkable |
+|---|---|---|
+| **measured money recovered** | `benchmark.py` | Against Razorpay's own documented policy as the control arm, on a fixed seed, with the losses printed too |
+| **across a batch** | `params/cohort.yaml` | 2000 mandates, and 20 independent replications so one lucky draw cannot carry the claim |
+| **compliant escalation** | `policy.py`, `engine.py` | The NPCI/RBI lattice gates every attempt in both arms; a debit that cannot clear silently escalates to a person instead of burning budget |
+| **stopping rules** | `engine.py`, `runner.py` | Terminal decline classes stop the cycle; 470 escalations replace 1,055 attempts on debits that could never clear |
+| **audit trail** | `audit.py` | Append-only and hash-chained. Editing an entry, forging its digest, or splicing one out all fail `verify()` |
+
+The one deliberate departure: the track's framing invites an agent that decides
+*and acts*. The scheduling decision here is deterministic and the AI layer is
+confined to reading prose, for the reason set out below — a model choosing when
+to debit a stranger's account is the part of this problem that cannot be
+audited, and the measured value of putting one there is +1.76%.
+
 ## Running it
 
 ```bash
 pip install -e ".[dev]"
 
-pytest -q                          # 254 tests
+pytest -q                          # 257 tests
 python tools/mutation_audit.py     # 12/12 mutations caught
 python -m fourshots.benchmark      # reproduce the headline table
 ```
@@ -265,8 +293,8 @@ evidence. One implementation passing its own tests is an assertion.
 
 [`ARCHITECTURE.md`](ARCHITECTURE.md) covers the boundaries and why each sits
 where it does — the information barrier, how both arms are kept comparable,
-where AI is deliberately absent, and the five things this build got wrong along
-the way.
+where AI is deliberately absent, and the six defects the checks caught along the
+way.
 
 | module | role |
 |---|---|
@@ -305,8 +333,14 @@ The bounding is the design:
 - Any failure — no credentials, network, malformed response — returns nothing
   and the conservative default stands. An outage at the model provider must not
   change scheduling behaviour.
-- Verdicts are **cached and committed**, so benchmark runs stay reproducible
-  and every model judgement behind the result can be read and disputed.
+- Verdicts are **cached to a file meant to be committed**, so a benchmark run is
+  reproducible and every model judgement behind a result can be read and
+  disputed rather than taken on trust. **This repository ships no cache**, so
+  the default run is triage-free and the layer is inert — the benchmark says so
+  on every run rather than leaving you to infer it. `python -m fourshots.triage`
+  populates it from a live model if you supply `ANTHROPIC_API_KEY`, and
+  `tests/test_triage.py::test_shipped_cache_state_matches_what_the_docs_claim`
+  fails if this paragraph and the repository ever disagree.
 
 **And it is worth about +1.76%.** We measured the ceiling with an oracle that
 reads the prose perfectly: `python -m fourshots.benchmark` prints it every run.

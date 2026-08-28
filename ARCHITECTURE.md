@@ -143,8 +143,13 @@ Four bounds, each tested:
 - Any failure — credentials, network, malformed response — returns nothing and
   the conservative default stands. An outage at the model provider must not
   change when someone's account is debited.
-- Verdicts are cached and committed, so benchmark runs stay reproducible and
-  every model judgement behind the result can be read and disputed.
+- Verdicts are cached to a file meant to be committed, so a benchmark run is
+  reproducible and every model judgement behind it can be read and disputed.
+  **This repository ships no cache**, so the default run is triage-free and
+  the layer is inert; the benchmark prints that rather than leaving it to be
+  inferred. `python -m fourshots.triage` derives the cohort's unmappable
+  codes and fills the cache from a live model. A test asserts the shipped
+  state and the documented claim never drift apart.
 
 With no API key the null triager runs and behaviour is identical to before the
 layer existed. **Measured ceiling: +1.76%**, against +49.2% from the

@@ -331,3 +331,83 @@ def credentials_available() -> bool:
     so a False here is a hint, not a guarantee of failure.
     """
     return bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
+
+
+def unmappable_codes() -> dict[str, str]:
+    """The decline codes in the pre-registered cohort that the taxonomy cannot
+    map, paired with the prose the rail returned alongside them.
+
+    This is exactly the input the triage layer exists to handle, so deriving it
+    from the cohort rather than hand-listing it keeps the cache honest: if a
+    later taxonomy change makes a code readable, it stops appearing here and the
+    stale verdict can be dropped.
+    """
+    import random
+
+    from fourshots.params import load
+    from fourshots.simulator import World, build_cohort
+    from fourshots.taxonomy import UNCLASSIFIED, classify
+    from fourshots.policy import IST
+    from datetime import datetime
+
+    params = load()
+    rng = random.Random(params.seed)
+    cohort = build_cohort(params, rng)
+    world = World(params, rng)
+    at = datetime(2026, 9, 26, 9, 0, tzinfo=IST)
+
+    found: dict[str, str] = {}
+    for mandate in cohort:
+        result = world.attempt(mandate, at, at)
+        if result.cleared:
+            continue
+        if classify(result.razorpay_code, result.npci_code).failure_class is UNCLASSIFIED:
+            found.setdefault(result.razorpay_code, result.description or "")
+    return found
+
+
+def _main() -> int:
+    """Populate the committed verdict cache.
+
+    Deliberately a separate command rather than something the benchmark does on
+    its own. A benchmark that silently calls a model is a benchmark whose number
+    depends on the weather at the provider; this one only ever reads a file
+    somebody chose to commit.
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(description=_main.__doc__)
+    parser.add_argument(
+        "--codes",
+        type=Path,
+        help="JSON object of code -> description. Defaults to the codes the "
+        "pre-registered cohort produces that the taxonomy cannot map.",
+    )
+    parser.add_argument("--cache", type=Path, default=DEFAULT_CACHE)
+    args = parser.parse_args()
+
+    if not credentials_available():
+        print(
+            "ANTHROPIC_API_KEY is not set, so there is nothing to refresh.\n"
+            "Exiting non-zero because the refresh you asked for did not happen "
+            "-- not because anything is broken. Without a key the engine runs "
+            "the null triager and behaves exactly as it does with no AI layer."
+        )
+        return 1
+
+    codes = (
+        json.loads(args.codes.read_text(encoding="utf-8"))
+        if args.codes
+        else unmappable_codes()
+    )
+    if not codes:
+        print("No unmappable codes found. Nothing to cache.")
+        return 0
+
+    written = refresh_cache(codes, cache_path=args.cache)
+    print(f"Wrote {written} verdict(s) to {args.cache}. Commit the file.")
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover - thin CLI wrapper
+    raise SystemExit(_main())
