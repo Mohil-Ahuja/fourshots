@@ -29,3 +29,6 @@ htmlcov/
 
 # Rust build artefacts
 rust/target/
+
+# Local editor/agent state. Never part of the project.
+.claude/
