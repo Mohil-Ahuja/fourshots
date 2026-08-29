@@ -302,10 +302,14 @@ check yet.
 
 ## Known limitations
 
-- **The four-attempt cap may be per cycle or per mandate lifetime.** Sources
-  describe it as per mandate "identified by each sequence number", which reads
-  as per-cycle. `mandates_saved` depends on that reading and it is not yet
-  confirmed against the primary NPCI circular.
+- **The four-attempt cap is read as per cycle, on corroboration rather than a
+  primary citation.** Four independent secondary readings agree and are
+  specific: one execution attempt plus three retries per mandate "based on its
+  sequence number", a sequence number being the individual execution within a
+  recurring series. The primary circular went to NPCI members rather than the
+  public circulars page. `mandates_saved` depends on the reading; the
+  per-lifetime alternative would flatter this engine rather than damage it,
+  since unspent attempts would carry forward.
 - **The cohort is synthetic.** No public dataset gives decline-reason
   breakdowns for Indian recurring debits. Distributions are pre-registered,
   sourced where possible, marked `assumed` where not, and swept where they

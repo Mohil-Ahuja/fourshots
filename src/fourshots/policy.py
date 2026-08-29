@@ -60,12 +60,18 @@ IST = timezone(timedelta(hours=5, minutes=30))
 MAX_ATTEMPTS_PER_CYCLE = 4
 """One original execution plus three retries, per NPCI (in force 2025-08-01).
 
-NOTE (open question, must be resolved before results are published): sources
-describe the cap as applying per mandate "identified by each sequence number",
-which reads as per-execution-cycle rather than per-mandate-lifetime. The
-simulator and the `mandates_saved` metric depend on this reading. It is
-flagged in the README as an outstanding verification item against the primary
-NPCI circular, and no headline claim should rest on it until confirmed.
+Per execution cycle, not per mandate lifetime. Four independent secondary
+readings of the guidelines agree and are specific: one execution attempt plus
+three retries per mandate "based on its sequence number", and a sequence
+number identifies the individual execution within a recurring series.
+
+The provenance is corroboration, not citation. The primary circular
+(*Guidelines on usage of UPI and API*, notified 2025-05-21, in force
+2025-08-01) went to NPCI members rather than the public circulars page, so it
+cannot be linked here, and the constant is flagged in the README accordingly.
+The simulator and `mandates_saved` depend on the reading; the per-lifetime
+alternative would make this engine look better rather than worse, because
+unspent attempts would carry into the next cycle.
 """
 
 # --- Constraint 2: execution windows --------------------------------------

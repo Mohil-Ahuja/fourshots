@@ -416,10 +416,17 @@ set of things this system will ever say to a customer. There are six.
 
 ## Honest limitations
 
-- **The 4-attempt cap may be per cycle or per mandate lifetime.** Sources
-  describe it as per mandate "identified by each sequence number", which reads
-  as per-cycle. The `mandates_saved` metric depends on this reading, and it is
-  not yet confirmed against the primary NPCI circular.
+- **The 4-attempt cap is read as per cycle, on corroboration rather than a
+  primary citation.** Four independent secondary readings of the NPCI
+  guidelines agree and are specific — one execution attempt plus three retries
+  per mandate "based on its sequence number", and a sequence number identifies
+  the individual execution within a recurring series. The primary circular
+  (*Guidelines on usage of UPI and API*, notified 2025-05-21, in force
+  2025-08-01) went to members rather than the public circulars page, so it is
+  not citable here. `mandates_saved` depends on this reading. Note the
+  direction of the risk: under the per-lifetime reading, unspent attempts
+  would carry into the next cycle and this engine would look better, not
+  worse.
 - **The cohort is synthetic.** No public dataset gives decline-reason
   breakdowns for Indian recurring debits. Distributions are declared, sourced
   where possible, marked `assumed` where not, and swept where they matter.

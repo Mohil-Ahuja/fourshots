@@ -173,10 +173,18 @@ Rust."
 
 ## Open verification items
 
-- [ ] **Is the NPCI 4-attempt cap per execution cycle or per mandate lifetime?**
-      Sources say "per mandate, identified by each sequence number", which reads
-      as per-cycle. The `mandates_saved` metric depends on it. No headline claim
-      may rest on it until checked against the primary circular.
+- [x] **Is the NPCI 4-attempt cap per execution cycle or per mandate lifetime?**
+      Per cycle. Four independent secondary readings agree and are specific:
+      one execution attempt plus three retries per mandate "based on its
+      sequence number", a sequence number being the individual execution
+      within a recurring series. Peak windows corroborate identically
+      (10:00-13:00, 17:00-21:30 IST).
+- [ ] **Cite the primary circular for the cap.** *Guidelines on usage of UPI
+      and API*, notified 2025-05-21, in force 2025-08-01, went to NPCI members
+      rather than the public circulars page, so provenance is corroboration
+      rather than citation. UPI_OC_No_223 (*Enhancement of UPI AutoPay*) is a
+      different circular and does not carry the cap. Resolve by getting the
+      member circular from anyone with NPCI or PSP access.
 - [ ] **Is 5 September the application deadline or the submission deadline?**
       Changes the calendar by weeks.
 
