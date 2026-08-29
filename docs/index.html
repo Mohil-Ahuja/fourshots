@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fourshots</title>
+<meta name="description" content="NPCI allows four attempts per mandate cycle. This decides how to spend them. Razorpay AI Buildathon 2026, Track 03.">
+<style>
+  :root {
+    --ground: #f5f7f9;
+    --surface: #ffffff;
+    --ink: #101720;
+    --muted: #5b6875;
+    --rule: #c3ccd6;
+    --faint: #d5dce3;
+    --accent: #0b6e5f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 8vh 24px 12vh;
+    background: var(--ground);
+    color: var(--ink);
+    font: 16px/1.6 "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 620px; margin: 0 auto; }
+  h1 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 34px;
+    font-weight: 400;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  .tagline { font-size: 17px; margin: 0 0 6px; }
+  .track { font-size: 13px; color: var(--muted); margin: 0 0 36px; }
+  p { margin: 0 0 20px; }
+  .lede { color: var(--muted); font-size: 15px; }
+  ul.links { list-style: none; padding: 0; margin: 32px 0 0; }
+  ul.links li { border-top: 1px solid var(--faint); }
+  ul.links li:last-child { border-bottom: 1px solid var(--faint); }
+  ul.links a {
+    display: block;
+    padding: 16px 2px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  ul.links a:hover .title { color: var(--accent); }
+  ul.links a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .title { font-weight: 600; font-size: 16px; }
+  .title::after { content: " \2192"; color: var(--muted); font-weight: 400; }
+  .sub { display: block; color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+  footer {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid var(--faint);
+    color: var(--muted);
+    font-size: 13px;
+  }
+  code {
+    font-family: "Courier New", monospace;
+    font-size: 0.92em;
+    background: var(--surface);
+    border: 1px solid var(--faint);
+    border-radius: 3px;
+    padding: 1px 4px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0e1319;
+      --surface: #161c24;
+      --ink: #e8edf2;
+      --muted: #97a4b2;
+      --rule: #2b3541;
+      --faint: #232c37;
+      --accent: #4bb59f;
+    }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>fourshots</h1>
+  <p class="tagline">NPCI allows four attempts per mandate cycle.<br>This decides how to spend them.</p>
+  <p class="track">Razorpay AI Buildathon 2026 — Track 03, AI Revenue Recovery</p>
+
+  <p class="lede">When a UPI AutoPay debit fails, the documented retry policy spends
+  all four attempts on consecutive days — every one of them, in the common case,
+  on a day the account is still empty. The budget is gone before the salary
+  arrives, and the mandate is cancelled. This project treats those four attempts
+  as a budget to allocate under regulatory constraint rather than a loop to run.</p>
+
+  <ul class="links">
+    <li>
+      <a href="four-attempts.html">
+        <span class="title">The whole argument, in one page</span>
+        <span class="sub">The mechanism, the measured result, the sensitivity sweep, where it loses, and what it cannot claim.</span>
+      </a>
+    </li>
+    <li>
+      <a href="architecture.svg">
+        <span class="title">The architecture, in one picture</span>
+        <span class="sub">One domain model, two consumers, and the information barrier that keeps the measurement honest.</span>
+      </a>
+    </li>
+    <li>
+      <a href="https://github.com/Mohil-Ahuja/fourshots">
+        <span class="title">The repository</span>
+        <span class="sub">Source, tests, the pre-registered parameter file, and the reasoning behind each decision.</span>
+      </a>
+    </li>
+  </ul>
+
+  <footer>
+    Every figure is reproducible: <code>python -m fourshots.benchmark</code> on a
+    fixed seed. Test mode only — no real funds and no real personal data.
+  </footer>
+</main>
+</body>
+</html>

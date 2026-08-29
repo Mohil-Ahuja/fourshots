@@ -4,6 +4,8 @@
 
 Razorpay AI Buildathon 2026 — Track 03, AI Revenue Recovery.
 
+**[The whole argument on one page →](https://mohil-ahuja.github.io/fourshots/)**
+
 ---
 
 ## The problem
@@ -287,11 +289,11 @@ ngrok http 8000                    # point the dashboard at /webhooks/razorpay
 
 Test mode only. No real funds, no real PII.
 
-`docs/four-attempts.html` is the whole argument as one page — the mechanism,
-the result, the sweep, where it loses, and what it cannot claim. Open it in a
-browser from a clone; GitHub renders `.html` as source rather than as a page.
-Its figures are pinned to a live benchmark run by the same check that pins the
-README's.
+[**mohil-ahuja.github.io/fourshots**](https://mohil-ahuja.github.io/fourshots/)
+is the whole argument as one page — the mechanism, the result, the sweep, where
+it loses, and what it cannot claim. It is `docs/four-attempts.html` in the
+repository, and its figures are pinned to a live benchmark run by the same
+check that pins the README's.
 
 ## The rules are written twice
 
