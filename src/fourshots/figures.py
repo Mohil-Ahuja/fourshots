@@ -149,6 +149,11 @@ EXPECTED: dict[str, tuple[str, ...]] = {
         "recovery_rate_engine",
         "recovered_baseline",
         "recovered_engine",
+        # The deltas are checked too. A stale "+51%" survived a full
+        # verification pass once, in prose well away from the results table,
+        # precisely because only the absolute figures were pinned.
+        "recovered_delta",
+        "mandates_saved_delta",
         "mandates_saved_baseline",
         "mandates_saved_engine",
         "attempts_baseline",
@@ -180,14 +185,11 @@ EXPECTED: dict[str, tuple[str, ...]] = {
         "gained_value",
         "gained_to_lost_ratio",
     ),
-    "DECISIONS.md": (
-        "recovery_rate_baseline",
-        "recovery_rate_engine",
-        "recovered_baseline",
-        "recovered_engine",
-        "mandates_saved_baseline",
-        "mandates_saved_engine",
-        "attempts_baseline",
-        "attempts_engine",
-    ),
+    # DECISIONS.md was on this list and has been removed on purpose. It used
+    # to restate the headline table, and the prose around that table drifted
+    # -- it was quoting wasted-attempt and mandates-saved figures from an
+    # earlier run while the pinned table beside it stayed current. A second
+    # copy of a number is a second thing to keep true. That document now
+    # carries no figures at all and points at the benchmark instead, which is
+    # a stronger guarantee than checking a duplicate.
 }

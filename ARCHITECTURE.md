@@ -14,40 +14,24 @@ model — what a decline code means, and what the regulations permit — is the
 only thing they have in common, which is what makes the benchmark a claim about
 the shipped logic rather than about a separate research script.
 
-```mermaid
-flowchart LR
-    subgraph live["Live service"]
-        RZP[Razorpay webhook] -->|raw bytes| VER[verify HMAC]
-        VER -->|rejected: no body kept| LOG
-        VER -->|verified| PARSE[parse event]
-        PARSE --> CLS
-        REC[recovery: decide] --> ACT["book the retry, or raise a payment link"]
-        ACT --> LOG
-    end
+![Three columns. The live service takes a Razorpay webhook through signature
+verification, event parsing and a recovery decision, then books a retry or
+raises a payment link; a rejected webhook is logged with its body discarded.
+The shared domain model in the centre holds the four constraints and is called
+identically by both sides. The experiment harness on the right holds ground
+truth in World and passes only a decline code, timestamp, amount and attempt
+count across a red information barrier into an Observation, which is all the
+engine and baseline ever see. Everything lands in one append-only hash-chained
+audit log.](docs/architecture.svg)
 
-    subgraph domain["Domain model — shared"]
-        CLS[taxonomy.classify]
-        POL[policy.check_legality]
-    end
+The line drawn in red is the one worth looking at. Everything a policy could
+use to cheat — the balance trajectory, the payday, the true failure mode — sits
+above it, and the only things that cross are the four facts a merchant actually
+receives from a webhook. Boundary 2 below is that line in detail.
 
-    subgraph bench["Experiment harness"]
-        WORLD[(World: ground truth)] -->|decline code only| OBS[Observation]
-        OBS --> ENG[engine / baseline]
-        ENG -->|proposed attempt| POL
-        POL -->|legal instant| WORLD
-    end
-
-    CLS --> REC
-    POL --> REC
-    CLS --> ENG
-    CLS --> LOG[(hash-chained audit log)]
-    POL --> LOG
-    ENG --> LOG
-```
-
-The dashed edge that does **not** exist is the important one: nothing runs from
-`World` to `engine`. That absence is the information barrier, and it is
-asserted structurally in `tests/test_simulator.py`.
+Note also what the centre column is: one implementation of the rules, called by
+both sides. The benchmark is therefore a claim about the code that runs in
+production, not about a research script that happens to resemble it.
 
 ---
 
@@ -225,7 +209,7 @@ Seven layers, because each catches what the others miss.
 
 | Layer | What it establishes | What it cannot |
 |---|---|---|
-| 336 tests | Behaviour matches intent | That the tests assert anything |
+| 335 tests | Behaviour matches intent | That the tests assert anything |
 | 97% coverage | Lines execute | That a bug in them is caught |
 | `tools/mutation_audit.py` | 12 deliberate defects all fail the suite | That untested behaviour exists elsewhere |
 | `tests/test_published_numbers.py` | Prose quotes current figures | That the figures are right |
@@ -240,8 +224,9 @@ its terminal-stop — and requiring the suite to fail on each is what shows the
 tests bite. Its first run caught 11 of 12, and the miss was the metric most
 exposed to challenge.
 
-CI runs all four, plus the benchmark itself, so a result that stops reproducing
-breaks the build.
+CI runs the suite, the coverage gate, the mutation audit and the
+published-numbers check, plus the benchmark and the Rust differential, so a
+result that stops reproducing breaks the build.
 
 ---
 

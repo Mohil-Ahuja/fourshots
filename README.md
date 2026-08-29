@@ -110,7 +110,7 @@ outage to clear — so recoveries land later.
 | fourshots | 1.0 | **6.0** | **16.0** | **25.0** |
 
 A merchant feels that as delayed cash even when the total is higher. Whether
-+51% recovered is worth a six-day mean delay is the merchant's call, not ours
++49.2% recovered is worth a six-day mean delay is the merchant's call, not ours
 — but it should be made with the number in view.
 
 **Mandate-level regressions.** Aggregate improvement is compatible with
@@ -163,7 +163,7 @@ being the dominant mode — which is an assumption, and is labelled as one.
 deliberate defects — regulatory constants that no longer match the circulars,
 compliance checks switched off, signature verification disabled, the engine
 losing its terminal-stop — and requires the suite to fail on each. 12/12 caught.
-Coverage is 98%, but coverage only proves lines ran.
+Coverage is 97%, but coverage only proves lines ran.
 
 ## What the checks caught
 
@@ -271,7 +271,7 @@ putting one there is +1.76%.
 ```bash
 pip install -e ".[dev]"
 
-pytest -q                          # 336 tests
+pytest -q                          # 335 tests
 python tools/mutation_audit.py     # 12/12 mutations caught
 python -m fourshots.benchmark      # reproduce the headline table
 python -m fourshots.outreach       # every message the system can send, on one screen
@@ -286,6 +286,12 @@ ngrok http 8000                    # point the dashboard at /webhooks/razorpay
 ```
 
 Test mode only. No real funds, no real PII.
+
+`docs/four-attempts.html` is the whole argument as one page — the mechanism,
+the result, the sweep, where it loses, and what it cannot claim. Open it in a
+browser from a clone; GitHub renders `.html` as source rather than as a page.
+Its figures are pinned to a live benchmark run by the same check that pins the
+README's.
 
 ## The rules are written twice
 
@@ -319,10 +325,21 @@ evidence. One implementation passing its own tests is an assertion.
 
 ## Layout
 
-[`ARCHITECTURE.md`](ARCHITECTURE.md) covers the boundaries and why each sits
-where it does — the information barrier, how both arms are kept comparable,
-where AI is deliberately absent, and the six defects the checks caught along the
-way.
+![Three columns. The live service takes a Razorpay webhook through signature
+verification, event parsing and a recovery decision, then books a retry or
+raises a payment link; a rejected webhook is logged with its body discarded.
+The shared domain model in the centre holds the four constraints and is called
+identically by both sides. The experiment harness on the right holds ground
+truth in World and passes only a decline code, timestamp, amount and attempt
+count across a red information barrier into an Observation, which is all the
+engine and baseline ever see. Everything lands in one append-only hash-chained
+audit log.](docs/architecture.svg)
+
+The red line is the one to look at: everything a policy could use to cheat sits
+above it, and the only things that cross are the four facts a merchant actually
+gets from a webhook. [`ARCHITECTURE.md`](ARCHITECTURE.md) covers that boundary
+and five others — how both arms are kept comparable, where AI is deliberately
+absent, and the six defects the checks caught along the way.
 
 | module | role |
 |---|---|
@@ -379,7 +396,7 @@ Any real model scores at or below that. The gap is small because unreadable
 codes are only ~2% of the cohort.
 
 That number is the honest answer to "how much is the AI doing here": the
-deterministic constraint work delivers +51%, the AI layer adds up to +1.8% on
+deterministic constraint work delivers +49.2%, the AI layer adds up to +1.8% on
 top. Inflating that would have been the easiest claim in the project and the
 least defensible one.
 

@@ -1,200 +1,205 @@
 # Decisions
 
-Standing decisions for the build, recorded so they survive the schedule and
-can be defended in the panel. Updated as things change; nothing here is
-retconned after a result lands.
+The choices behind this build, and the reasoning that has to survive being
+questioned. The [README](README.md) has the problem and the results;
+[ARCHITECTURE.md](ARCHITECTURE.md) has the boundaries. This has the *why*,
+including for the things that were reversed.
 
-## Track
+Nothing here is written after the fact to fit a result. Where a decision was
+wrong, it says so and says what replaced it.
 
-**Track 03 — AI Revenue Recovery.** One submission is allowed, so track
-crowding is a first-order variable, not a tiebreaker. Track 01 (Agentic
-Commerce) draws the most entries and its strongest submissions converge on the
-same researched answer: a policy gateway with scoped mandates and an audit log,
-which is a scaled-down clone of Visa TAP and Mastercard Agent Pay.
+---
 
-Track 03's bar reads as a spec for this project:
+## 1. Treat this as budget allocation, not "smarter retries"
 
-> "Show measured money recovered across a batch, with compliant escalation,
-> stopping rules, and an audit trail."
+The framing decided everything downstream.
 
-Each clause maps to a component: money recovered → the benchmark; stopping
-rules → the attempt budget; compliant escalation → the RBI/NPCI constraint
-lattice; audit trail → the hash chain.
+NPCI allows four executions per mandate cycle — one original plus three
+retries, in force 1 August 2025. Razorpay's documented default spends them on
+consecutive days: *"We automatically retry the payment on the following day."*
+No variation by failure reason, no merchant configurability.
 
-## The thesis
+A debit that fails on the 26th for insufficient funds therefore burns all four
+attempts by the 29th, every one on a day the account is provably empty, and the
+cycle is cancelled before salary lands on the 1st. That is the mechanical
+explanation for a documented industry number: roughly 20 million UPI AutoPay
+revocations a month, driven by low balances.
 
-NPCI allows **four executions per mandate cycle** (1 original + 3 retries,
-in force 2025-08-01). Razorpay's documented default spends them on consecutive
-days: *"We automatically retry the payment on the following day."* No variation
-by failure reason, no merchant configurability.
+So the problem is **attempt-budget allocation under regulatory constraint**.
+Four shots, each committed 24 hours ahead under the RBI pre-debit notification
+rule, each landing in one of three daily non-peak windows, with the decline
+code from attempt *N* the only evidence available for scheduling attempt *N+1*.
+A constrained sequential decision problem with commitment delay.
 
-So a debit that fails on the 26th for insufficient funds burns all four
-attempts by the 29th — every one on a day the account is provably empty —
-and the cycle is cancelled before salary lands on the 1st.
+Calling it "smart retries" would have produced a heuristic. Calling it budget
+allocation produced a constraint lattice, a taxonomy with provenance, and a
+measurable comparison.
 
-This is the mechanical explanation for a documented industry number: roughly
-**20 million UPI AutoPay revocations per month** driven by low balances
-(Business Standard, Sept 2025).
+## 2. Make the control arm Razorpay's own documented policy
 
-The project is therefore **attempt-budget allocation under regulatory
-constraint**, not "smart retries". Four shots, each committed 24 hours ahead
-under the RBI pre-debit notification rule, each landing in one of three daily
-non-peak windows, with the decline code from attempt N the only evidence for
-scheduling attempt N+1. A constrained sequential decision problem with
-commitment delay.
+The predictable objection to any result like this is *you built the simulator
+and you built the optimizer*. The cheapest defence is a baseline nobody can
+call a strawman.
 
-## Where AI goes, and where it does not
+The control arm is read from the pre-registered parameter file with its
+citation attached, and tests pin its three defining properties: it retries on
+consecutive days, it ignores the decline code, and it spends its whole budget.
+If any of those stopped being true, the comparison would be against something
+invented here.
 
-Deliberate and defensible in the panel:
+It is not handicapped in any other way either — same budget, same legality
+gate, same `Observation` type. It simply proposes worse attempts.
 
-- **Deterministic, never a model:** attempt-budget accounting, execution-window
-  legality, 24h notice, AFA thresholds, terminal-code detection, opt-out.
-  Putting an LLM in the debit-scheduling path would be indefensible.
-- **Agentic:** diagnosing failure class and choosing which remaining attempt to
-  spend, and when.
-- **LLM-only:** triaging the residual unresolved exceptions at the end, and
-  writing the escalation copy for the mandates the engine refuses to retry
-  (`outreach.py`). Both are language jobs. Neither can change a schedule: the
-  triager picks from a closed set of classes, and the drafter is never given a
-  figure, so a draft containing any digit is rejected before it can be sent.
+The framing that follows from this matters: the result is a **measurable
+improvement to a documented default**, not a claim that anyone's retry logic is
+bad.
 
-## Methodology — defending the headline number
+## 3. Pre-register the cohort, then do not touch it
 
-The predictable attack is *"you built the simulator and the optimizer."*
-Four answers, all cheap:
+`params/cohort.yaml` was committed before the simulator, both policy arms, and
+any result existed. The git history is the evidence, and the file has
+deliberately not been edited since — not even to update a prose caveat that has
+since been overtaken, because an extra commit against it costs more than the
+stale sentence it would fix.
 
-1. **Information barrier.** The engine sees only what a real merchant sees from
-   a webhook: decline code, timestamp, amount, attempts remaining. It never
-   touches the simulator's balance trajectory. Enforced by module boundary.
-2. **Pre-registration.** Cohort parameters are committed with sources *before*
-   any result exists. The git history is the evidence.
-3. **Sensitivity sweep.** The win is reported across a range of assumptions,
-   not one tuned setting.
-4. **Quotable baseline.** The control arm is Razorpay's own documented policy,
-   not a strawman we invented.
+Every parameter declares its provenance. Most are marked `assumed` with
+reasoning rather than dressed up with an invented citation, because no primary
+source publishes a decline-reason breakdown for failed recurring debits in
+India. The ones marked `assumed` are exactly what the sensitivity sweeps exist
+to test.
 
-## Metrics to report
+## 4. Keep the model out of the money decision
 
-- Rupees recovered vs the baseline arm, on the same 4-attempt budget
-- **Mandates saved** — cycles that survived instead of being cancelled. Ties to
-  the 20M/month revocation figure and reframes recovery as retention.
-- Recovery rate by failure class
-- Attempts consumed per success
-- Compliance violations (target: 0, against a baseline that would violate)
-- An honest unresolved-exception list
-- Taxonomy coverage: how much of the domain model is documented vs inferred
+Deliberate, and the line is drawn in code rather than in prose.
 
-## Video — beats in order
+- **Deterministic, never a model:** attempt-budget accounting,
+  execution-window legality, the 24-hour notice, AFA thresholds, terminal-code
+  detection, opt-out. A language model choosing when to debit a stranger's
+  account cannot be tested exhaustively, cannot be audited line by line, and
+  fails by producing a plausible-sounding wrong date.
+- **Deterministic and interesting:** diagnosing the failure class and choosing
+  which remaining attempt to spend, and when. This is where the result comes
+  from.
+- **Model-only:** reading the prose a rail attaches to codes the taxonomy
+  cannot map, and writing the escalation copy for the mandates the engine
+  refuses to retry. Both are language jobs that a lookup table genuinely cannot
+  do.
 
-Five minutes. Open on the problem, not the architecture.
+Neither model-backed layer can change a schedule. The triager picks from a
+closed set of classes the taxonomy already defines; the drafter is never given
+a figure, so any draft containing a digit is rejected before it can be sent.
+With no API key at all, both fall back and behaviour is identical.
 
-1. **The calendar image.** Two rows of a month. Row 1: four attempts stacked on
-   the 26th–29th, every one on a flat-balance day, mandate dies. Row 2: attempt
-   held, placed in the post-salary window, recovered. Understandable in three
-   seconds without knowing a single NPCI rule. This is the pitch.
-2. **The number.** ~20M revocations/month on low balance.
-3. **The constraint that nobody knows.** Four attempts, three daily windows,
-   24h commitment. State that most retry systems do not model any of it.
-4. **The baseline is Razorpay's own documented policy** — quote the docs line.
-   Framed as a measurable improvement to a documented default, never as
-   "Razorpay's retry is dumb". We are applying to work there.
-5. **The design we killed.** The first engine aimed each balance retry at a
-   hardcoded Indian-payroll prior and scored +41%. The sensitivity sweep
-   shifted the world's payday by three days, the prior stayed fixed, and the
-   advantage degraded to +9.9% -- it was being told the answer more than
-   reading the world. Spreading attempts evenly across the cycle needs no
-   payday belief and holds at +46.9% worst case. Say this out loud in the video: building the
-   clever version, testing it honestly, and shipping the robust one is the
-   whole argument for the methodology.
-6. **The live failure.** A real test-mode payment returned
-   `international_transaction_not_allowed`, a code the taxonomy had never seen.
-   It degraded to the conservative class with a 24h floor rather than crashing
-   or guessing, and recorded that its own mapping confidence was `inferred`.
-   Found by pointing the receiver at the real rail — the synthetic cohort would
-   never have produced that code. This is the "one failure handled gracefully".
-7. **The headline result** + the sensitivity sweep behind it.
-8. **The loop closing, on camera.** Point the receiver at the real rail, drive
-   a `failure@razorpay` payment, and show the response: classified, gated,
-   and either booked with its pre-debit notice or escalated with a Payment
-   Link that exists in the test dashboard. Then show the message that goes
-   with it, in Hinglish. The distinction to say out loud: the *decision* is
-   deterministic, the *sentence* is written by a model, and a booked retry is
-   logged as booked rather than as fired at the rail.
-9. **Audit chain verification live** — edit one rupee in the log, watch verify
-   fail, on camera.
+The measured ceiling on the triage layer is published rather than estimated,
+and it is small. Inflating it would have been the easiest claim in the project
+and the least defensible.
 
-## Result so far (D5)
+## 5. Report the losses next to the win
 
-2000 mandates, seed 20260827, September 2026:
+Every number in the README is produced by `python -m fourshots.benchmark` on a
+fixed seed, and the benchmark prints the costs on the same run as the gains:
+the cash-flow lag the engine's patience creates, and the mandates the baseline
+recovered that the engine did not.
 
-| | baseline | engine | delta |
-|---|---|---|---|
-| recovery rate | 44.1% | 62.8% | +42.4% |
-| recovered | INR 49.9L | INR 74.4L | +49.2% |
-| mandates saved | 883 | 1,601 | +81.3% |
-| attempts spent | 5,857 | 4,057 | -30.7% |
-| attempts per recovery | 6.63 | 3.23 | -51.3% |
+A net figure that hides its components invites exactly one question, and it is
+better to have answered it already.
 
-More money and more mandates from fewer attempts. Attempts spent on debits
-that could never clear fall from 1,540 to 598.
+Figures are deliberately not restated in this document. They live in the README
+and are pinned there by `tests/test_published_numbers.py`, which fails the build
+if the prose and a live run disagree. Restating them here would create a second
+copy to drift — which is what happened to an earlier version of this file.
 
-Two corrections made before reporting, both worth telling: the payday prior
-was killed by the sweep (above), and `mandates_saved` originally counted an
-early stop on a dead mandate as a saved customer, which it is not -- fixing it
-cut the engine's figure from 1,721 to 1,610.
+## 6. Implement the regulatory gate twice
 
-## Rust
+`policy.py` decides whether a debit against someone's account is permitted at
+all. Everywhere else in this system a bug surfaces as a worse number; there it
+surfaces as an illegal attempt that the benchmark still scores as fine, and no
+aggregate metric would reveal it.
 
-**Scope: the constraint engine only.** Pure, no I/O, tight API, ~300 lines,
-already exhaustively tested — the tests become the port spec. It is also the
-component where the claim means something, because it is the money-decision
-gate.
+So the lattice is reimplemented in Rust from the circulars rather than from the
+Python, and a differential test requires the two to agree exhaustively.
 
-**Not** the receiver (done, working), the decisioning layer (talks to an LLM),
-or the analysis.
+**It is an oracle, not a backend.** The benchmark runs in seconds, so a faster
+implementation solves nothing, and selecting between implementations at runtime
+would mean behaviour depending on whether an extension compiled on a given
+machine — a real risk bought for no benefit. Python remains the only execution
+path; without the toolchain the differential test skips and nothing else
+changes.
 
-**Shape:** Python stays the shipped reference implementation; Rust is an
-optional accelerated backend, imported if the extension is present and silently
-skipped if not. A judge who clones without a Rust toolchain must still get a
-working repo — a failed `pip install` is worse than no Rust at all.
+The part worth showing is not "we used Rust" but the differential test itself.
+A reimplementation is a risk that requires evidence, not a flourish.
 
-**The part worth showing** is not "we used Rust" but the differential test: a
-property test generates random attempts and asserts both implementations return
-identical legality verdicts. A reimplementation is a risk requiring evidence,
-not a flex.
+## 7. Close the loop, and say exactly how far it closes
 
-**Timing: D8, after the headline result exists.** Rust on an unfinished result
-adds nothing. Drop it without loss if the schedule slips.
+A live `payment.failed` webhook is decided, gated, and acted on — not merely
+classified and filed.
 
-**Trigger to do it earlier:** if the sensitivity sweep exceeds a couple of
-minutes, the simulation kernel becomes a legitimate performance target.
-"We ported it because the sweep took 40 minutes" beats "we ported it because
-Rust."
+The honest part is the boundary. Razorpay exposes no call that re-attempts a
+mandate on a date of your choosing; the subscription's schedule belongs to the
+gateway. So a retryable decline is **booked and notified**, and its audit entry
+records `executed_against_rail: false`. An escalation, by contrast, is
+**executed**: a Payment Link raised against the test-mode API, with its id and
+URL hash-chained into the log.
 
-## Open verification items
+It would have been easy to log both as "scheduled" and let a reader assume the
+rail was touched. What is not executed is disclosed rather than implied.
 
-- [x] **Is the NPCI 4-attempt cap per execution cycle or per mandate lifetime?**
-      Per cycle. Four independent secondary readings agree and are specific:
-      one execution attempt plus three retries per mandate "based on its
-      sequence number", a sequence number being the individual execution
-      within a recurring series. Peak windows corroborate identically
-      (10:00-13:00, 17:00-21:30 IST).
-- [ ] **Cite the primary circular for the cap.** *Guidelines on usage of UPI
-      and API*, notified 2025-05-21, in force 2025-08-01, went to NPCI members
-      rather than the public circulars page, so provenance is corroboration
-      rather than citation. UPI_OC_No_223 (*Enhancement of UPI AutoPay*) is a
-      different circular and does not carry the cap. Resolve by getting the
-      member circular from anyone with NPCI or PSP access.
-- [ ] **Is 5 September the application deadline or the submission deadline?**
-      Changes the calendar by weeks.
+---
 
-## Known debt
+## Decisions that were reversed
+
+### The payday prior, killed by our own sensitivity sweep
+
+The first engine held a belief about Indian payroll — salaries near the 1st,
+a cluster around the 7th — and aimed each balance retry at the next plausible
+payday. It performed well.
+
+Then the sweep shifted the *world's* payday distribution by three days while
+the prior stayed fixed, and the advantage collapsed. The engine was being told
+the answer more than it was reading the world.
+
+Spreading attempts evenly across the cycle needs no payday belief at all and
+holds up far better across the whole range. The offsets are even thirds of a
+roughly thirty-day cycle, derived from the cycle length rather than fitted to
+the cohort — a fitted constant would have reintroduced exactly the overfitting
+the sweep had just removed.
+
+Building the clever version, testing it honestly, and shipping the robust one
+is the whole argument for the methodology.
+
+### A retention metric that flattered us
+
+`mandates_saved` originally counted every early stop as a saved mandate,
+including mandates whose VPA no longer resolved. Stopping early there is still
+the right call — it saves three wasted attempts — but it does not save a
+customer, and counting it as one inflated the metric most exposed to challenge.
+It was caught by the mutation audit and corrected downward.
+
+[`ARCHITECTURE.md`](ARCHITECTURE.md#what-the-checks-caught) lists all six
+defects the verification caught, and which check caught each.
+
+---
+
+## Open items
+
+- [ ] **Cite the primary circular for the four-attempt cap.** The reading is
+      settled — per execution cycle, not per mandate lifetime; four independent
+      secondary readings agree and are specific, describing one execution
+      attempt plus three retries per mandate "based on its sequence number",
+      a sequence number being the individual execution within a recurring
+      series. What is missing is the citation: *Guidelines on usage of UPI and
+      API*, notified 21 May 2025 and in force 1 August 2025, went to NPCI
+      members rather than the public circulars page. `UPI_OC_No_223`
+      (*Enhancement of UPI AutoPay*) is a different circular and does not carry
+      the cap. Resolving this needs the member circular from someone with NPCI
+      or PSP access.
+
+## Known limits of the live path
 
 - Razorpay exposes no API call that re-attempts a mandate on a chosen date, so
-  a booked retry is scheduled and notified but not submitted to the rail. The
-  audit entry records `executed_against_rail: false`. Closing that last inch
-  needs either a Subscriptions-side schedule API or the merchant's own debit
-  connectivity.
-- UPI QR and Intent cannot be tested in test mode (Razorpay docs); only UPI
-  Collect works. A local checkout page using Checkout.js is needed at D6 to
-  drive `failure@razorpay` and control the payment method for the demo.
+  a booked retry is scheduled and notified but not submitted to the rail.
+  Closing that last inch needs either a Subscriptions-side schedule API or the
+  merchant's own debit connectivity.
+- UPI QR and Intent cannot be exercised in test mode; only UPI Collect works.
+  Driving a controlled failure end to end therefore goes through a local
+  checkout page rather than the hosted flow.

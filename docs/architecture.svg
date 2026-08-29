@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" width="960" height="600"
+     role="img" aria-label="Two independent consumers share one domain model. On the left, the live service takes a Razorpay webhook through signature verification, event parsing, and a recovery decision, then books a retry or raises a payment link. On the right, the experiment harness holds ground truth in World, passes only a decline code, timestamp, amount and attempt count across an information barrier into an Observation, and runs the engine and baseline arms. In the centre, taxonomy.classify and policy.check_legality are called identically by both sides. Everything lands in one append-only hash-chained audit log. The information barrier is drawn in red: balance, payday and the true failure mode never cross it.">
+
+  <title>One domain model, two consumers, one barrier</title>
+
+  <rect x="0" y="0" width="960" height="600" fill="#f5f7f9"/>
+
+  <defs>
+    <marker id="a-ink" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#5b6875"/>
+    </marker>
+    <marker id="a-red" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#a8442c"/>
+    </marker>
+  </defs>
+
+  <text x="32" y="32" font-family="Georgia, serif" font-size="17" fill="#101720">One domain model, two consumers, one barrier</text>
+  <text x="32" y="52" font-family="Helvetica Neue, Arial, sans-serif" font-size="11" fill="#5b6875">The live service and the benchmark share the rules. Neither depends on the other, which is what makes the measurement a claim about the shipped logic.</text>
+
+  <!-- lane panels -->
+  <rect x="32"  y="72" width="260" height="428" rx="8" fill="#ffffff" stroke="#d5dce3"/>
+  <rect x="350" y="72" width="260" height="428" rx="8" fill="#ffffff" stroke="#d5dce3"/>
+  <rect x="668" y="72" width="260" height="428" rx="8" fill="#ffffff" stroke="#d5dce3"/>
+
+  <text x="162" y="94" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="11" fill="#101720" letter-spacing="0.6">LIVE SERVICE</text>
+  <text x="480" y="94" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="11" fill="#101720" letter-spacing="0.6">DOMAIN MODEL — SHARED</text>
+  <text x="798" y="94" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="11" fill="#101720" letter-spacing="0.6">EXPERIMENT HARNESS</text>
+
+  <!-- ================= live service column ================= -->
+  <rect x="52" y="108" width="220" height="42" rx="6" fill="#ffffff" stroke="#c3ccd6"/>
+  <text x="162" y="134" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#101720">Razorpay webhook</text>
+
+  <rect x="52" y="190" width="220" height="42" rx="6" fill="#ffffff" stroke="#c3ccd6"/>
+  <text x="162" y="216" text-anchor="middle" font-family="Courier New, monospace" font-size="12" fill="#101720">verify_signature()</text>
+
+  <rect x="52" y="272" width="220" height="42" rx="6" fill="#ffffff" stroke="#c3ccd6"/>
+  <text x="162" y="298" text-anchor="middle" font-family="Courier New, monospace" font-size="12" fill="#101720">parse_event()</text>
+
+  <rect x="52" y="354" width="220" height="42" rx="6" fill="#ffffff" stroke="#c3ccd6"/>
+  <text x="162" y="380" text-anchor="middle" font-family="Courier New, monospace" font-size="12" fill="#101720">recovery.handle()</text>
+
+  <rect x="52" y="436" width="220" height="42" rx="6" fill="#ffffff" stroke="#c3ccd6"/>
+  <text x="162" y="456" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="11" fill="#101720">book the retry, or raise a link</text>
+  <text x="162" y="470" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#5b6875">booked is logged as booked, not as fired</text>
+
+  <line x1="162" y1="150" x2="162" y2="188" stroke="#5b6875" marker-end="url(#a-ink)"/>
+  <text x="170" y="174" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#5b6875">raw bytes</text>
+
+  <line x1="162" y1="232" x2="162" y2="270" stroke="#5b6875" marker-end="url(#a-ink)"/>
+  <text x="170" y="256" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#5b6875">verified</text>
+
+  <line x1="162" y1="314" x2="162" y2="352" stroke="#5b6875" marker-end="url(#a-ink)"/>
+  <text x="170" y="338" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#5b6875">DeclineObserved</text>
+
+  <line x1="162" y1="396" x2="162" y2="434" stroke="#5b6875" marker-end="url(#a-ink)"/>
+  <text x="170" y="420" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#5b6875">decision</text>
+
+  <!-- rejected webhook: recorded, body discarded -->
+  <path d="M 52 211 H 22 V 528" fill="none" stroke="#5b6875" stroke-dasharray="4 3" marker-end="url(#a-ink)"/>
+  <text transform="translate(17,380) rotate(-90)" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#5b6875">rejected — body never stored</text>
+
+  <!-- ================= shared domain model ================= -->
+  <text x="480" y="128" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="10" fill="#101720">the constraints, stated once</text>
+  <text x="480" y="150" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="10" fill="#5b6875">4 executions per mandate cycle</text>
+  <text x="480" y="168" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="10" fill="#5b6875">non-peak windows only</text>
+  <text x="480" y="186" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="10" fill="#5b6875">24-hour pre-debit notice</text>
+  <text x="480" y="204" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="10" fill="#5b6875">AFA above the threshold</text>
+  <text x="480" y="230" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#5b6875">also written a second time in Rust, as a differential oracle</text>
+
+  <rect x="370" y="272" width="220" height="42" rx="6" fill="#ffffff" stroke="#c3ccd6"/>
+  <text x="480" y="298" text-anchor="middle" font-family="Courier New, monospace" font-size="12" fill="#101720">taxonomy.classify()</text>
+
+  <rect x="370" y="354" width="220" height="42" rx="6" fill="#ffffff" stroke="#c3ccd6"/>
+  <text x="480" y="380" text-anchor="middle" font-family="Courier New, monospace" font-size="12" fill="#101720">policy.check_legality()</text>
+
+  <text x="480" y="332" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#5b6875">one implementation, called identically by both sides</text>
+
+  <line x1="274" y1="293" x2="368" y2="293" stroke="#5b6875" marker-end="url(#a-ink)"/>
+  <text x="321" y="287" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#5b6875">error_reason</text>
+
+  <line x1="686" y1="293" x2="592" y2="293" stroke="#5b6875" marker-end="url(#a-ink)"/>
+  <text x="639" y="287" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#5b6875">last decline</text>
+
+  <line x1="274" y1="375" x2="368" y2="375" stroke="#5b6875" marker-end="url(#a-ink)"/>
+  <text x="321" y="369" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#5b6875">attempt</text>
+
+  <line x1="686" y1="375" x2="592" y2="375" stroke="#5b6875" marker-end="url(#a-ink)"/>
+  <text x="639" y="369" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#5b6875">attempt</text>
+
+  <line x1="480" y1="396" x2="480" y2="528" stroke="#5b6875" marker-end="url(#a-ink)"/>
+  <text x="488" y="424" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#5b6875">every violation recorded</text>
+
+  <!-- ================= experiment harness ================= -->
+  <rect x="688" y="108" width="220" height="42" rx="6" fill="#ffffff" stroke="#c3ccd6"/>
+  <text x="798" y="128" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#101720">World — ground truth</text>
+  <text x="798" y="142" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#5b6875">balance, payday, true failure mode</text>
+
+  <rect x="688" y="272" width="220" height="42" rx="6" fill="#ffffff" stroke="#c3ccd6"/>
+  <text x="798" y="298" text-anchor="middle" font-family="Courier New, monospace" font-size="12" fill="#101720">Observation</text>
+
+  <rect x="688" y="354" width="220" height="42" rx="6" fill="#ffffff" stroke="#c3ccd6"/>
+  <text x="798" y="380" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#101720">engine / baseline</text>
+
+  <rect x="688" y="436" width="220" height="42" rx="6" fill="#ffffff" stroke="#c3ccd6"/>
+  <text x="798" y="456" text-anchor="middle" font-family="Courier New, monospace" font-size="12" fill="#101720">runner</text>
+  <text x="798" y="470" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#5b6875">both arms, one harness</text>
+
+  <!-- the information barrier -->
+  <line x1="672" y1="211" x2="762" y2="211" stroke="#a8442c" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <line x1="834" y1="211" x2="924" y2="211" stroke="#a8442c" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="674" y="204" font-family="Helvetica Neue, Arial, sans-serif" font-size="10" fill="#a8442c">information barrier</text>
+  <text x="674" y="228" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#a8442c">balance, payday and true mode stay above it</text>
+
+  <line x1="798" y1="150" x2="798" y2="270" stroke="#5b6875" marker-end="url(#a-ink)"/>
+  <text x="788" y="252" text-anchor="end" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#5b6875">code · time · amount · attempts used</text>
+
+  <line x1="798" y1="314" x2="798" y2="352" stroke="#5b6875" marker-end="url(#a-ink)"/>
+  <line x1="798" y1="396" x2="798" y2="434" stroke="#5b6875" marker-end="url(#a-ink)"/>
+  <text x="806" y="420" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#5b6875">proposed instant</text>
+
+  <!-- ================= audit log ================= -->
+  <line x1="162" y1="478" x2="162" y2="528" stroke="#5b6875" marker-end="url(#a-ink)"/>
+  <line x1="798" y1="478" x2="798" y2="528" stroke="#5b6875" marker-end="url(#a-ink)"/>
+
+  <rect x="32" y="530" width="896" height="48" rx="8" fill="#ffffff" stroke="#c3ccd6"/>
+  <text x="52" y="551" font-family="Courier New, monospace" font-size="12" fill="#101720">audit.py</text>
+  <text x="122" y="551" font-family="Helvetica Neue, Arial, sans-serif" font-size="12" fill="#101720">— append-only, hash-chained</text>
+  <text x="52" y="567" font-family="Helvetica Neue, Arial, sans-serif" font-size="9.5" fill="#5b6875">Each entry commits to every entry before it. Editing one, forging its digest, or splicing one out all fail verify().</text>
+</svg>
