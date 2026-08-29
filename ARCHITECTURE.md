@@ -21,6 +21,8 @@ flowchart LR
         VER -->|rejected: no body kept| LOG
         VER -->|verified| PARSE[parse event]
         PARSE --> CLS
+        REC[recovery: decide] --> ACT["book the retry, or raise a payment link"]
+        ACT --> LOG
     end
 
     subgraph domain["Domain model — shared"]
@@ -35,6 +37,8 @@ flowchart LR
         POL -->|legal instant| WORLD
     end
 
+    CLS --> REC
+    POL --> REC
     CLS --> ENG
     CLS --> LOG[(hash-chained audit log)]
     POL --> LOG
@@ -56,10 +60,13 @@ asserted structurally in `tests/test_simulator.py`.
 | `simulator.py` | The cohort and its ground truth, behind the information barrier. |
 | `policies.py` | The baseline arm: Razorpay's documented default. |
 | `engine.py` | The constraint-aware arm. |
-| `triage.py` | The only place a language model is consulted. |
+| `triage.py` | Reads the prose on codes the taxonomy cannot map. |
+| `outreach.py` | Writes the escalation copy. The other place a model is consulted. |
 | `runner.py` | The harness both arms pass through, identically. |
 | `audit.py` | Append-only hash-chained decision log. |
 | `webhook.py`, `app.py` | Live Razorpay ingestion. |
+| `recovery.py` | Closes the loop: a live decline becomes a recorded, executed action. |
+| `razorpay_client.py` | Test-mode REST client. Refuses a live key in code. |
 | `rust/src/lib.rs` | Independent reimplementation of the gate, used as a differential oracle. |
 | `benchmark.py`, `figures.py` | Reproduce and publish the results. |
 | `params.py` | Loads and validates the pre-registered cohort parameters. |
@@ -128,10 +135,12 @@ exhaustively, cannot be audited line by line, and fails by producing a
 plausible-sounding wrong date. Attempt accounting, window legality, notice
 periods, AFA thresholds and terminal detection are all deterministic.
 
-The model does one thing a lookup table cannot: read the prose a rail attaches
-to a decline code the taxonomy has never seen. It proposes a **classification,
-never a schedule**, from a closed set; the engine then does exactly what it
-always does with that class.
+The model does two things a lookup table cannot, and neither of them is
+choosing a moment.
+
+**It reads the prose** a rail attaches to a decline code the taxonomy has never
+seen, and proposes a **classification, never a schedule**, from a closed set;
+the engine then does exactly what it always does with that class.
 
 Four bounds, each tested:
 
@@ -154,6 +163,27 @@ Four bounds, each tested:
 With no API key the null triager runs and behaviour is identical to before the
 layer existed. **Measured ceiling: +1.76%**, against +49.2% from the
 deterministic work.
+
+**And it writes the escalation message**, in `outreach.py`, for the ~470
+mandates a run the engine refuses to retry. Whether to escalate is already
+decided by then; what is open is what to say, which differs by blocker and is
+often better said in Hinglish than English.
+
+The bound here is structural rather than behavioural. The model is never given
+the amount, so it cannot write a correct one: it returns prose containing
+`{merchant}`, `{amount}`, `{link}` and `{deadline}`, and `recovery.py`
+substitutes the mandate's own figures afterwards. A draft is rejected for any
+digit, any placeholder outside that set, a missing amount or link, or excess
+length — and rejection falls back to the reviewed templates, which are what
+ships, which every test and benchmark run exercises, and which are held to the
+same validator. The audit entry records the template, the rendered message and
+which drafter produced it, so wording can be approved once for a whole class
+and still be inspected per customer.
+
+This layer is deliberately outside the +1.76%. It changes no schedule, so the
+benchmark cannot measure it, and attaching a recovery-rate number to message
+quality would be exactly the unfalsifiable claim this document exists to
+avoid.
 
 ### 5. The regulatory gate is implemented twice
 
@@ -195,15 +225,15 @@ Seven layers, because each catches what the others miss.
 
 | Layer | What it establishes | What it cannot |
 |---|---|---|
-| 254 tests | Behaviour matches intent | That the tests assert anything |
-| 98% coverage | Lines execute | That a bug in them is caught |
+| 336 tests | Behaviour matches intent | That the tests assert anything |
+| 97% coverage | Lines execute | That a bug in them is caught |
 | `tools/mutation_audit.py` | 12 deliberate defects all fail the suite | That untested behaviour exists elsewhere |
 | `tests/test_published_numbers.py` | Prose quotes current figures | That the figures are right |
 | 20 replications | The effect is not one lucky seed | That the cohort model is right |
 | Two sensitivity sweeps | It survives payday and decline-mix assumptions | That other assumptions hold |
 | Rust differential oracle | Two independent implementations of the gate agree | That both are not wrong the same way |
 
-The mutation audit is the load-bearing one. A suite at 98% coverage can assert
+The mutation audit is the load-bearing one. A suite at 97% coverage can assert
 almost nothing; introducing real defects — a regulatory constant that no longer
 matches the circular, signature verification switched off, the engine losing
 its terminal-stop — and requiring the suite to fail on each is what shows the

@@ -134,3 +134,27 @@ def test_engine_still_beats_baseline_in_the_published_figures(figures) -> None:
     """The documents assert an improvement. If that ever stopped being true,
     updating the numbers would not be the right fix."""
     assert figures["recovered_delta"].renderings[0].startswith("+")
+
+
+def test_both_documents_quote_the_same_test_count() -> None:
+    """The two documents drifted apart on this once already.
+
+    The count itself cannot be checked from inside a test run without asserting
+    on the collection that is running -- which breaks the moment anyone runs a
+    single file. What can be checked, cheaply and reliably, is that the README
+    and ARCHITECTURE.md do not disagree with each other.
+    """
+    import re
+
+    counts = {}
+    for name in ("README.md", "ARCHITECTURE.md"):
+        text = (REPO / name).read_text(encoding="utf-8")
+        found = re.findall(r"(\d+) tests\b", text)
+        assert found, f"{name} no longer quotes a test count"
+        counts[name] = set(found)
+
+    shared = set.intersection(*counts.values())
+    assert shared, (
+        f"README.md quotes {sorted(counts['README.md'])} tests and "
+        f"ARCHITECTURE.md quotes {sorted(counts['ARCHITECTURE.md'])}"
+    )

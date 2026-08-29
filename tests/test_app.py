@@ -22,14 +22,23 @@ def client(tmp_path):
     The app is built by a factory, so each test gets its own log and its own
     secret by injection. No module-cache clearing, no environment mutation, and
     no chance of one test's decisions leaking into another's chain.
+
+    The recovery service is injected with no Razorpay client, which is what
+    makes this suite safe to run on a machine that has test keys in its `.env`:
+    the decisions are all made and logged, and nothing leaves the process.
     """
     from fastapi.testclient import TestClient
 
     from fourshots.app import create_app
     from fourshots.audit import AuditLog
+    from fourshots.recovery import RecoveryService
 
     audit = AuditLog(tmp_path / "audit.jsonl")
-    application = create_app(audit=audit, webhook_secret=SECRET)
+    application = create_app(
+        audit=audit,
+        webhook_secret=SECRET,
+        recovery=RecoveryService(audit, merchant_name="Example Merchant"),
+    )
     return TestClient(application), audit
 
 
@@ -78,12 +87,15 @@ def test_signed_decline_is_accepted_and_classified(client) -> None:
     http, _ = client
     response = post_signed(http, decline("insufficient_funds"))
     assert response.status_code == 200
-    assert response.json() == {
-        "accepted": True,
-        "event": "payment.failed",
-        "failure_class": "insufficient_balance",
-        "terminal": False,
-    }
+    body = response.json()
+    assert body["accepted"] is True
+    assert body["event"] == "payment.failed"
+    assert body["failure_class"] == "insufficient_balance"
+    assert body["terminal"] is False
+    # A balance failure is retryable, so the endpoint does not merely classify
+    # it -- it books the next attempt and says when.
+    assert body["decision"]["action"] == "retry_booked"
+    assert body["decision"]["execute_at"] is not None
 
 
 def test_terminal_decline_is_flagged_as_such(client) -> None:
@@ -129,7 +141,8 @@ def test_decision_lands_in_a_verifiable_chain(client) -> None:
 
     verified = http.get("/audit/verify").json()
     assert verified["verified"] is True
-    assert verified["entries"] == 2
+    # Two declines, and the action taken about each one.
+    assert verified["entries"] == 4
 
 
 def test_audit_entry_records_reasoning_and_provenance(client) -> None:
@@ -205,3 +218,44 @@ def test_unmodelled_event_is_still_logged(client) -> None:
     post_signed(http, {"event": "settlement.processed", "payload": {}})
     entry = next(iter(audit.read()))
     assert entry.kind == "event_ignored"
+
+
+def test_a_terminal_decline_escalates_over_http(client) -> None:
+    """The endpoint does not stop at classifying. A debit that cannot clear
+    silently comes back with the message that will be sent about it."""
+    http, _ = client
+    decision = post_signed(http, decline("invalid_vpa")).json()["decision"]
+    assert decision["action"] == "escalated"
+    assert "Example Merchant" in decision["message"]
+    # No test keys are injected here, so nothing left the process -- and the
+    # response says that rather than implying a link exists.
+    assert decision["executed"] is False
+    assert decision["payment_link_url"] is None
+
+
+def test_recovery_actions_are_read_back_out_of_the_chain(client) -> None:
+    http, _ = client
+    post_signed(http, decline("insufficient_funds"))
+    post_signed(http, decline("invalid_vpa"))
+
+    body = http.get("/recovery/actions").json()
+    assert [action["kind"] for action in body["actions"]] == [
+        "attempt_booked",
+        "escalation_drafted",
+    ]
+    assert body["count"] == 2
+    # Same bytes as the verifier reads, so a schedule shown here cannot
+    # disagree with a log that verifies.
+    assert http.get("/audit/verify").json()["verified"] is True
+
+
+def test_a_redelivered_webhook_cannot_spend_a_fifth_attempt(client) -> None:
+    """Razorpay retries webhook delivery. Five deliveries must not become five
+    executions -- NPCI permits four."""
+    http, _ = client
+    actions = [
+        post_signed(http, decline("insufficient_funds")).json()["decision"]["action"]
+        for _ in range(5)
+    ]
+    assert actions.count("retry_booked") == 3
+    assert actions[-2:] == ["stopped", "stopped"]

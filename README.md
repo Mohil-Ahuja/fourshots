@@ -211,6 +211,31 @@ This is not only a simulation. The service ingests real Razorpay webhooks:
 - Every decision lands in an append-only, hash-chained audit log. Editing an
   entry, forging its digest, or splicing one out all fail `verify()`.
 
+And the loop is closed. A `payment.failed` webhook is not merely classified and
+filed: `recovery.py` runs the same engine the benchmark measures, puts the
+result through the same regulatory gate, and then acts.
+
+- **A retryable decline is booked**, with the RBI pre-debit notification the
+  framework requires actually constructed rather than described. Razorpay
+  exposes no call that re-attempts a mandate on a date you choose — the
+  subscription's schedule belongs to the gateway — so the attempt is scheduled
+  and notified but not submitted to the rail, and the audit entry records
+  `executed_against_rail: false` rather than letting a reader assume otherwise.
+- **A decline that cannot clear silently is escalated for real.** A Payment
+  Link is created against the test-mode API, its id and URL are hash-chained
+  into the log, and the message that carries it is drafted by `outreach.py`.
+  `reference_id` is the mandate plus the failed payment, so a redelivered
+  webhook cannot raise a second link and ask the customer to pay twice.
+- **The four-attempt budget is rebuilt from the audit log, not held in
+  memory.** A redeployed server does not hand every mandate a fresh set of
+  four, and five webhook deliveries do not become five executions.
+- **A live key is refused in code**, not in a warning: the client rejects any
+  key id that is not `rzp_test_`. With no keys at all every decision is still
+  made, gated and logged, with `executed: false` recorded rather than implied.
+- `GET /recovery/actions` reads the actions back out of the same bytes
+  `/audit/verify` checks, so the schedule cannot disagree with a log that
+  verifies.
+
 A real test-mode payment is what surfaced our first unmapped code
 (`international_transaction_not_allowed`). The system degraded to its
 conservative class rather than crashing or guessing — and the synthetic cohort
@@ -229,24 +254,27 @@ Each clause is a component rather than a paragraph:
 |---|---|---|
 | **measured money recovered** | `benchmark.py` | Against Razorpay's own documented policy as the control arm, on a fixed seed, with the losses printed too |
 | **across a batch** | `params/cohort.yaml` | 2000 mandates, and 20 independent replications so one lucky draw cannot carry the claim |
-| **compliant escalation** | `policy.py`, `engine.py` | The NPCI/RBI lattice gates every attempt in both arms; a debit that cannot clear silently escalates to a person instead of burning budget |
-| **stopping rules** | `engine.py`, `runner.py` | Terminal decline classes stop the cycle; 470 escalations replace 1,055 attempts on debits that could never clear |
+| **compliant escalation** | `policy.py`, `engine.py`, `recovery.py` | The NPCI/RBI lattice gates every attempt in both arms; a debit that cannot clear silently escalates to a person instead of burning budget, and on a live webhook that escalation is a Payment Link actually raised in test mode, with its pre-debit notice constructed |
+| **stopping rules** | `engine.py`, `runner.py`, `recovery.py` | Terminal decline classes stop the cycle; 470 escalations replace 1,055 attempts on debits that could never clear. In the live service the budget is rebuilt from the log, so a redelivered webhook cannot spend a fifth |
 | **audit trail** | `audit.py` | Append-only and hash-chained. Editing an entry, forging its digest, or splicing one out all fail `verify()` |
 
 The one deliberate departure: the track's framing invites an agent that decides
-*and acts*. The scheduling decision here is deterministic and the AI layer is
-confined to reading prose, for the reason set out below — a model choosing when
-to debit a stranger's account is the part of this problem that cannot be
-audited, and the measured value of putting one there is +1.76%.
+*and acts*. It acts — a live decline is decided, gated, booked or escalated,
+and executed. But the *decision* is deterministic, and the AI layer is confined
+to language: reading the prose on codes the taxonomy cannot map, and writing
+the escalation message. A model choosing when to debit a stranger's account is
+the part of this problem that cannot be audited, and the measured value of
+putting one there is +1.76%.
 
 ## Running it
 
 ```bash
 pip install -e ".[dev]"
 
-pytest -q                          # 257 tests
+pytest -q                          # 336 tests
 python tools/mutation_audit.py     # 12/12 mutations caught
 python -m fourshots.benchmark      # reproduce the headline table
+python -m fourshots.outreach       # every message the system can send, on one screen
 ```
 
 To receive live webhooks:
@@ -306,6 +334,9 @@ way.
 | `runner.py` | the harness both arms run through, identically |
 | `audit.py` | append-only hash-chained decision log |
 | `webhook.py` / `app.py` | live Razorpay ingestion |
+| `recovery.py` | the closed loop: a live decline in, a recorded action out |
+| `outreach.py` | the escalation copy, English and Hinglish |
+| `razorpay_client.py` | test-mode REST client. Refuses a live key |
 
 ## Where AI is used, and where it deliberately is not
 
@@ -351,6 +382,37 @@ That number is the honest answer to "how much is the AI doing here": the
 deterministic constraint work delivers +51%, the AI layer adds up to +1.8% on
 top. Inflating that would have been the easiest claim in the project and the
 least defensible one.
+
+**Where it earns its place a second time:** writing the escalation message.
+The engine refuses to spend an attempt on ~470 mandates a run — a dead
+mandate, a breached limit, an AFA flow that needs a human — and those are
+exactly the customers who have to be *told* something. The ask differs by
+blocker, and a large share of recovery messaging in India is written in
+Hinglish rather than English. That is a language job, not a template-slot job.
+
+The bound is the same shape, and it is structural rather than a matter of the
+model behaving well:
+
+- The model returns prose containing `{merchant}`, `{amount}`, `{link}` and
+  `{deadline}`. It is never given the amount, so it cannot write a correct one
+  — and a draft containing **any digit at all** is rejected, because a digit
+  means an invented figure and a wrong rupee amount in a customer's SMS is
+  worse than a plain template. So is an invented placeholder, and so is a draft
+  that omits the sum or the way to pay it.
+- The facts are substituted afterwards, by `recovery.py`, from the mandate.
+- Rejection is never fatal. Every failure path falls back to the reviewed
+  templates, which are what ships and what every test and benchmark run
+  exercises — and those templates are held to the same validator the model's
+  output is.
+- The audit entry records the template, the rendered message, and which drafter
+  produced it. A reviewer can approve wording once for a whole class of
+  mandates and still see exactly what each customer was sent.
+
+This layer is deliberately **not** in the +1.76%. It changes no schedule, so
+the benchmark cannot measure it, and claiming a recovery-rate number for
+message quality would be the kind of unfalsifiable figure the rest of this
+document exists to avoid. `python -m fourshots.outreach` prints the complete
+set of things this system will ever say to a customer. There are six.
 
 ## Honest limitations
 

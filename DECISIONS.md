@@ -52,7 +52,11 @@ Deliberate and defensible in the panel:
   Putting an LLM in the debit-scheduling path would be indefensible.
 - **Agentic:** diagnosing failure class and choosing which remaining attempt to
   spend, and when.
-- **LLM-only:** triaging the residual unresolved exceptions at the end.
+- **LLM-only:** triaging the residual unresolved exceptions at the end, and
+  writing the escalation copy for the mandates the engine refuses to retry
+  (`outreach.py`). Both are language jobs. Neither can change a schedule: the
+  triager picks from a closed set of classes, and the drafter is never given a
+  figure, so a draft containing any digit is rejected before it can be sent.
 
 ## Methodology — defending the headline number
 
@@ -109,7 +113,14 @@ Five minutes. Open on the problem, not the architecture.
    Found by pointing the receiver at the real rail — the synthetic cohort would
    never have produced that code. This is the "one failure handled gracefully".
 7. **The headline result** + the sensitivity sweep behind it.
-8. **Audit chain verification live** — edit one rupee in the log, watch verify
+8. **The loop closing, on camera.** Point the receiver at the real rail, drive
+   a `failure@razorpay` payment, and show the response: classified, gated,
+   and either booked with its pre-debit notice or escalated with a Payment
+   Link that exists in the test dashboard. Then show the message that goes
+   with it, in Hinglish. The distinction to say out loud: the *decision* is
+   deterministic, the *sentence* is written by a model, and a booked retry is
+   logged as booked rather than as fired at the rail.
+9. **Audit chain verification live** — edit one rupee in the log, watch verify
    fail, on camera.
 
 ## Result so far (D5)
@@ -171,9 +182,11 @@ Rust."
 
 ## Known debt
 
-- `app.py` builds its `AuditLog` at import time, so tests clear the module
-  cache to isolate logs. Works, but should become a factory before the repo
-  goes public.
+- Razorpay exposes no API call that re-attempts a mandate on a chosen date, so
+  a booked retry is scheduled and notified but not submitted to the rail. The
+  audit entry records `executed_against_rail: false`. Closing that last inch
+  needs either a Subscriptions-side schedule API or the merchant's own debit
+  connectivity.
 - UPI QR and Intent cannot be tested in test mode (Razorpay docs); only UPI
   Collect works. A local checkout page using Checkout.js is needed at D6 to
   drive `failure@razorpay` and control the payment method for the demo.

@@ -22,6 +22,8 @@ from fastapi import FastAPI, Request, Response, status
 
 from fourshots.audit import AuditLog, ChainBroken
 from fourshots.config import load_env, optional, require
+from fourshots.razorpay_client import client_or_none
+from fourshots.recovery import RecoveryService, decisions_from
 from fourshots.webhook import (
     SIGNATURE_HEADER,
     DeclineObserved,
@@ -36,17 +38,29 @@ from fourshots.webhook import (
 def create_app(
     audit: AuditLog | None = None,
     webhook_secret: str | None = None,
+    recovery: RecoveryService | None = None,
 ) -> FastAPI:
     """Build the application.
 
-    Both dependencies are injectable. The secret is resolved lazily, per
+    Every dependency is injectable. The secret is resolved lazily, per
     request, when not supplied -- so importing this module never requires a
     configured environment, but a running server still fails loudly on the
     first webhook if the secret is missing rather than degrading verification
     into a formality.
+
+    The recovery service is built with whatever Razorpay test keys are
+    configured, and with none if there are none. A live key is refused outright
+    rather than being quietly downgraded to no client at all: running this
+    against a real account is not a mode, it is a mistake.
     """
     load_env()
     audit_log = audit or AuditLog(optional("AUDIT_LOG_PATH", "out/audit.jsonl"))
+    recovery_service = recovery or RecoveryService(
+        audit_log,
+        client=client_or_none(),
+        merchant_name=optional("MERCHANT_NAME", "your merchant"),
+        language=optional("OUTREACH_LANGUAGE", "english"),
+    )
 
     application = FastAPI(
         title="fourshots",
@@ -84,6 +98,17 @@ def create_app(
                 "reason": broken.reason,
             }
         return {"verified": True, "entries": verified, "head": audit_log.head}
+
+    @application.get("/recovery/actions")
+    def recovery_actions() -> dict[str, Any]:
+        """Every recovery action taken, read back out of the audit log.
+
+        Read from the chain rather than from memory on purpose: this endpoint
+        and `/audit/verify` are then two views of the same bytes, so a schedule
+        shown here cannot disagree with a log that verifies.
+        """
+        actions = decisions_from(audit_log.read())
+        return {"count": len(actions), "actions": actions}
 
     @application.post("/webhooks/razorpay")
     async def razorpay_webhook(request: Request, response: Response) -> dict[str, Any]:
@@ -136,11 +161,16 @@ def create_app(
                 mandate_id=parsed.subscription_id,
                 at=parsed.at,
             )
+            # Recorded first, decided second: the entry above is part of the
+            # history the four-attempt budget is counted from, so deciding
+            # before writing it would let a redelivered webhook spend a fifth.
+            decision = recovery_service.handle(parsed)
             return {
                 "accepted": True,
                 "event": event_name,
                 "failure_class": cls.failure_class.name,
                 "terminal": cls.is_terminal,
+                "decision": decision.to_dict(),
             }
 
         if isinstance(parsed, DowntimeObserved):
