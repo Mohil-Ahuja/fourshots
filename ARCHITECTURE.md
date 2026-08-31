@@ -51,6 +51,7 @@ production, not about a research script that happens to resemble it.
 | `webhook.py`, `app.py` | Live Razorpay ingestion. |
 | `recovery.py` | Closes the loop: a live decline becomes a recorded, executed action. |
 | `razorpay_client.py` | Test-mode REST client. Refuses a live key in code. |
+| `console.py` | Builds and signs demo webhooks for the console. Decides nothing. |
 | `rust/src/lib.rs` | Independent reimplementation of the gate, used as a differential oracle. |
 | `benchmark.py`, `figures.py` | Reproduce and publish the results. |
 | `params.py` | Loads and validates the pre-registered cohort parameters. |
@@ -209,7 +210,7 @@ Seven layers, because each catches what the others miss.
 
 | Layer | What it establishes | What it cannot |
 |---|---|---|
-| 335 tests | Behaviour matches intent | That the tests assert anything |
+| 381 tests | Behaviour matches intent | That the tests assert anything |
 | 97% coverage | Lines execute | That a bug in them is caught |
 | `tools/mutation_audit.py` | 12 deliberate defects all fail the suite | That untested behaviour exists elsewhere |
 | `tests/test_published_numbers.py` | Prose quotes current figures | That the figures are right |

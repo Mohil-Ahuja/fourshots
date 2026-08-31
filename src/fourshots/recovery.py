@@ -57,7 +57,11 @@ from fourshots.policy import (
     Violation,
     check_legality,
 )
-from fourshots.razorpay_client import RazorpayError, RazorpayClient
+from fourshots.razorpay_client import (
+    RazorpayClient,
+    RazorpayError,
+    idempotency_reference,
+)
 from fourshots.simulator import DeclineRecord, Observation
 from fourshots.taxonomy import Blocker
 from fourshots.webhook import DeclineObserved
@@ -114,7 +118,12 @@ class RecoveryDecision:
             "failure_class": self.failure_class,
             "blocker": self.blocker.value,
             "attempts_used": self.attempts_used,
-            "attempts_remaining": MAX_ATTEMPTS_PER_CYCLE - self.attempts_used,
+            # Floored at zero. A redelivered webhook can push the observed
+            # count past the cap, and "-1 attempts remaining" is not a thing
+            # that can be true -- the budget is empty, and that is all it says.
+            "attempts_remaining": max(
+                0, MAX_ATTEMPTS_PER_CYCLE - self.attempts_used
+            ),
             "execute_at": self.execute_at.isoformat() if self.execute_at else None,
             "violations": [violation.value for violation in self.violations],
             "message": self.draft.body if self.draft else None,
@@ -193,6 +202,23 @@ class RecoveryService:
             )
         records.sort(key=lambda record: record.at)
         return tuple(records)
+
+    def status(self) -> dict[str, Any]:
+        """What this service will and will not do, in this configuration.
+
+        The console renders this verbatim. Every field is capable of saying
+        "no": a run with no Razorpay keys and no model key reports both, rather
+        than presenting a demo that silently drafts from templates as though a
+        model had written the copy.
+        """
+        return {
+            "executes_outward": self._client is not None,
+            "triager": self._engine.triager_name,
+            "drafter": getattr(self._drafter, "name", "template"),
+            "merchant_name": self._merchant_name,
+            "language": self._language,
+            "max_attempts_per_cycle": MAX_ATTEMPTS_PER_CYCLE,
+        }
 
     def booked_attempts(self) -> tuple[BookedAttempt, ...]:
         """Retries booked by this process, in the order they were booked."""
@@ -417,7 +443,9 @@ class RecoveryService:
                     ),
                     # Mandate plus the failed payment, so a repeated webhook
                     # for the same cycle cannot raise a second link.
-                    reference_id=f"{mandate_id}:{decline.payment_id}",
+                    reference_id=idempotency_reference(
+                        mandate_id, decline.payment_id
+                    ),
                     notes={
                         "mandate_id": mandate_id,
                         "failure_class": failure_class_name,

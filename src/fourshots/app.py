@@ -12,18 +12,29 @@ Run it with:
     uvicorn fourshots.app:app --port 8000
 then expose it with `ngrok http 8000` and point the dashboard webhook at
 https://<subdomain>.ngrok-free.dev/webhooks/razorpay
+
+With `CONSOLE_ENABLED=true`, http://localhost:8000/console serves a page that
+drives this same endpoint against synthetic declines. It is a window onto the
+running service, not a second implementation of it: it can only reach the
+system through the webhook route, signature and all.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request, Response, status
+from fastapi.responses import FileResponse
 
+from fourshots import console as demo
 from fourshots.audit import AuditLog, ChainBroken
 from fourshots.config import load_env, optional, require
+from fourshots.engine import ConstraintAwareEngine
+from fourshots.outreach import default_drafter
 from fourshots.razorpay_client import client_or_none
 from fourshots.recovery import RecoveryService, decisions_from
+from fourshots.triage import default_triager
 from fourshots.webhook import (
     SIGNATURE_HEADER,
     DeclineObserved,
@@ -55,9 +66,16 @@ def create_app(
     """
     load_env()
     audit_log = audit or AuditLog(optional("AUDIT_LOG_PATH", "out/audit.jsonl"))
+    # Both model-backed layers are wired in here and nowhere deeper, so the
+    # live service reads unmappable declines and drafts escalation copy with
+    # exactly the configuration the benchmark reports. Each resolves to its
+    # offline default when no key is present, and `/console/status` says which
+    # one is in force rather than leaving a viewer to assume.
     recovery_service = recovery or RecoveryService(
         audit_log,
+        engine=ConstraintAwareEngine(default_triager()),
         client=client_or_none(),
+        drafter=default_drafter(),
         merchant_name=optional("MERCHANT_NAME", "your merchant"),
         language=optional("OUTREACH_LANGUAGE", "english"),
     )
@@ -109,6 +127,96 @@ def create_app(
         """
         actions = decisions_from(audit_log.read())
         return {"count": len(actions), "actions": actions}
+
+    # --- demo console ----------------------------------------------------
+    #
+    # Three small routes, all inert unless CONSOLE_ENABLED is set. They serve a
+    # page, describe what this deployment can do, and sign a synthetic webhook
+    # so the browser can post it. None of them decide anything: the decision
+    # still happens in the webhook handler below, reached over HTTP like any
+    # other caller.
+
+    def console_guard() -> dict[str, Any] | None:
+        if demo.console_enabled():
+            return None
+        return {
+            "enabled": False,
+            "reason": (
+                "Set CONSOLE_ENABLED=true in .env to switch the demo console "
+                "on. It is off by default because it can write entries into "
+                "the decision log."
+            ),
+        }
+
+    @application.get("/console")
+    def console_page(response: Response) -> Any:
+        page = Path(__file__).resolve().parents[2] / "docs" / "console.html"
+        if not page.exists():
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return {"error": "docs/console.html is missing"}
+        return FileResponse(page, media_type="text/html")
+
+    @application.get("/console/status")
+    def console_status(response: Response) -> dict[str, Any]:
+        """What this deployment will actually do, plus the demo scenarios.
+
+        Served even when the console is disabled, so the page can explain why
+        it is inert instead of failing silently.
+        """
+        blocked = console_guard()
+        if blocked is not None:
+            return blocked
+        return {
+            "enabled": True,
+            "scenarios": demo.scenario_catalogue(),
+            "service": recovery_service.status(),
+            "audit_head": audit_log.head,
+        }
+
+    @application.post("/console/new-mandate")
+    def console_new_mandate(response: Response) -> dict[str, Any]:
+        """A fresh demo mandate id, and therefore a fresh attempt budget.
+
+        Nothing is deleted to produce it. The log is append-only and the point
+        of the demo is that it stays that way.
+        """
+        blocked = console_guard()
+        if blocked is not None:
+            response.status_code = status.HTTP_403_FORBIDDEN
+            return blocked
+        return {"mandate_id": demo.new_mandate_id()}
+
+    @application.post("/console/sign")
+    async def console_sign(request: Request, response: Response) -> dict[str, Any]:
+        """Build one demo webhook and sign it. Never signs bytes it was given.
+
+        The body comes back as a string rather than an object because the
+        browser has to post these exact bytes: a signature commits to bytes,
+        and re-encoding a parsed object is free to reorder keys and break it.
+        """
+        blocked = console_guard()
+        if blocked is not None:
+            response.status_code = status.HTTP_403_FORBIDDEN
+            return blocked
+
+        asked = await request.json()
+        try:
+            payload = demo.build_payload(
+                mandate_id=asked.get("mandate_id", ""),
+                scenario_key=asked.get("scenario", ""),
+                amount=asked.get("amount", "0"),
+            )
+            body = demo.canonical_body(payload)
+            signature = demo.sign(body, secret())
+        except demo.ScenarioRejected as rejected:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return {"error": str(rejected)}
+
+        return {
+            "body": body.decode("utf-8"),
+            "signature": signature,
+            "header": SIGNATURE_HEADER,
+        }
 
     @application.post("/webhooks/razorpay")
     async def razorpay_webhook(request: Request, response: Response) -> dict[str, Any]:

@@ -30,6 +30,7 @@ from base64 import b64encode
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from hashlib import sha256
 from typing import Any
 
 from fourshots.config import load_env, optional
@@ -68,6 +69,34 @@ class PaymentLink:
     amount: Decimal
     reference_id: str | None
     created_at: datetime | None
+
+
+REFERENCE_ID_MAX = 40
+"""Razorpay's documented ceiling on `reference_id`.
+
+Enforced here rather than discovered from a 400. An escalation that fails
+because an identifier was two characters too long is a wasted recovery, and it
+fails at the least convenient moment: after the decision, in production, on the
+mandates that most need reaching.
+"""
+
+
+def idempotency_reference(*parts: str) -> str:
+    """A stable reference for one logical event, inside the length limit.
+
+    Digested rather than concatenated because the obvious construction --
+    mandate id and payment id joined -- lands at 37 characters for real
+    Razorpay ids, three below the ceiling, and silently exceeds it for anything
+    longer. An identifier whose validity depends on both ids staying exactly
+    their current width is not an identifier, it is a latent outage.
+
+    The digest is deterministic, so the idempotency property is unchanged: the
+    same mandate and the same failed payment produce the same reference, and
+    Razorpay rejects the second link rather than asking a customer to pay
+    twice. The readable ids travel in `notes` and in the description.
+    """
+    joined = ":".join(parts)
+    return "fs_" + sha256(joined.encode("utf-8")).hexdigest()[:32]
 
 
 def _to_paise(amount: Decimal) -> int:
@@ -183,6 +212,11 @@ class RazorpayClient:
             "reminder_enable": False,
         }
         if reference_id:
+            if len(reference_id) > REFERENCE_ID_MAX:
+                raise ValueError(
+                    f"reference_id is {len(reference_id)} characters; Razorpay "
+                    f"allows {REFERENCE_ID_MAX}. Use idempotency_reference()."
+                )
             payload["reference_id"] = reference_id
         if notes:
             payload["notes"] = notes

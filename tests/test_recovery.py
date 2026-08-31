@@ -19,6 +19,10 @@ from fourshots.policy import (
 )
 from fourshots.razorpay_client import PaymentLink, RazorpayError
 from fourshots.recovery import Action, RecoveryService, decisions_from
+from fourshots.razorpay_client import (
+    REFERENCE_ID_MAX,
+    idempotency_reference,
+)
 from fourshots.taxonomy import Blocker, classify
 from fourshots.webhook import DeclineObserved
 
@@ -179,7 +183,12 @@ def test_an_escalation_creates_a_real_payment_link_when_keys_exist(audit) -> Non
     assert decision.draft.body.endswith("https://rzp.io/i/abcd")
     call = client.calls[0]
     assert call["amount"] == Decimal("2499.00")
-    assert call["reference_id"] == "sub_Test01:pay_Test01"
+    # Pinned as a property rather than a literal. The readable form -- the two
+    # ids joined -- is 37 characters for real Razorpay ids and silently over
+    # the API's 40-character limit for anything longer, which is how every
+    # escalation came to fail with a 400 against the live test-mode API.
+    assert call["reference_id"] == idempotency_reference("sub_Test01", "pay_Test01")
+    assert len(call["reference_id"]) <= REFERENCE_ID_MAX
 
     entry = next(e for e in audit.read() if e.kind == "escalation_executed")
     assert entry.data["payment_link_url"] == "https://rzp.io/i/abcd"

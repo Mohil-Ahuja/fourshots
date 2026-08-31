@@ -226,8 +226,9 @@ result through the same regulatory gate, and then acts.
 - **A decline that cannot clear silently is escalated for real.** A Payment
   Link is created against the test-mode API, its id and URL are hash-chained
   into the log, and the message that carries it is drafted by `outreach.py`.
-  `reference_id` is the mandate plus the failed payment, so a redelivered
-  webhook cannot raise a second link and ask the customer to pay twice.
+  `reference_id` is a digest of the mandate and the failed payment, so a
+  redelivered webhook cannot raise a second link and ask the customer to pay
+  twice.
 - **The four-attempt budget is rebuilt from the audit log, not held in
   memory.** A redeployed server does not hand every mandate a fresh set of
   four, and five webhook deliveries do not become five executions.
@@ -242,6 +243,15 @@ A real test-mode payment is what surfaced our first unmapped code
 (`international_transaction_not_allowed`). The system degraded to its
 conservative class rather than crashing or guessing — and the synthetic cohort
 would never have produced that code.
+
+Driving the console against the live API caught the second one. Every
+escalation was failing with a 400: `reference_id` was the mandate id and the
+payment id joined, which is 37 characters for real Razorpay ids and over the
+40-character limit for anything longer. It was three characters from being an
+outage on exactly the mandates that most need reaching, and no unit test could
+have found it, because the limit is the API's and the tests inject the
+transport. The reference is now a bounded digest and the client enforces the
+limit locally, so the failure is loud and local instead of remote and late.
 
 ## The Track 03 bar, clause by clause
 
@@ -273,7 +283,7 @@ putting one there is +1.76%.
 ```bash
 pip install -e ".[dev]"
 
-pytest -q                          # 335 tests
+pytest -q                          # 381 tests
 python tools/mutation_audit.py     # 12/12 mutations caught
 python -m fourshots.benchmark      # reproduce the headline table
 python -m fourshots.outreach       # every message the system can send, on one screen
@@ -288,6 +298,27 @@ ngrok http 8000                    # point the dashboard at /webhooks/razorpay
 ```
 
 Test mode only. No real funds, no real PII.
+
+### The decision console
+
+Set `CONSOLE_ENABLED=true` in `.env`, start the server, and open
+<http://localhost:8000/console>. Pick a decline, send it, and watch what the
+service does with it: the class it reads, the constraint check, the attempt
+booked into a legal window or the escalation raised as a real test-mode Payment
+Link, the drafted message, and the chain re-verifying underneath.
+
+It is a window onto the running service rather than a second implementation of
+it. The page holds no secret and decides nothing — it asks the server to sign
+one of a fixed set of demo declines, then posts those exact bytes to
+`/webhooks/razorpay` like any other caller, so what it demonstrates is the code
+path a real webhook takes. It is off by default, it will only sign payloads it
+built itself, and it refuses any mandate id outside a `sub_demo_` namespace, so
+a demo can never spend a real mandate's attempts.
+
+Send the same decline five times to watch the budget run out and stay out.
+There is no button to clear the log, deliberately: the chain is append-only and
+a demo that deleted history would be showing the opposite of the claim. "New"
+starts a fresh mandate instead.
 
 [**mohil-ahuja.github.io/fourshots**](https://mohil-ahuja.github.io/fourshots/)
 is the whole argument as one page — the mechanism, the result, the sweep, where

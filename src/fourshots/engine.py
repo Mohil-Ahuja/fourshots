@@ -103,6 +103,17 @@ class ConstraintAwareEngine:
         """
         self._triager = triager or NullTriager()
 
+    @property
+    def triager_name(self) -> str:
+        """Which triager this engine will consult, for reporting.
+
+        Exposed because "is the model layer actually active here?" is a
+        question worth being able to answer from outside without reaching into
+        the engine, and worth answering honestly: the offline no-op reports
+        itself as such rather than being hidden behind a friendlier label.
+        """
+        return getattr(self._triager, "name", "none")
+
     def _classify(self, observation: Observation) -> Classification:
         """Read the decline, asking the triager only when the table cannot."""
         decline = observation.last_decline

@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fourshots — decision console</title>
+<meta name="description" content="Send a real signed payment.failed webhook at the running service and watch what it decides, gates and records.">
+<style>
+  :root {
+    --ground: #f5f7f9;
+    --surface: #ffffff;
+    --sunk: #eef1f4;
+    --ink: #101720;
+    --muted: #5b6875;
+    --rule: #c3ccd6;
+    --faint: #d5dce3;
+    --accent: #0b6e5f;
+    --warn: #a8442c;
+    --shadow: 0 1px 2px rgba(16, 23, 32, 0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0e1319;
+      --surface: #161c24;
+      --sunk: #11161d;
+      --ink: #e8edf2;
+      --muted: #97a4b2;
+      --rule: #2b3541;
+      --faint: #232c37;
+      --accent: #4bb59f;
+      --warn: #e0836a;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 28px 24px 64px;
+    background: var(--ground);
+    color: var(--ink);
+    font: 14px/1.55 "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+
+  /* --- header --- */
+  header { border-bottom: 1px solid var(--faint); padding-bottom: 16px; margin-bottom: 24px; }
+  h1 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 26px; font-weight: 400; margin: 0 0 3px; letter-spacing: -0.01em;
+  }
+  h1 span { color: var(--muted); }
+  .sub { color: var(--muted); margin: 0 0 14px; max-width: 62ch; }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill {
+    font-size: 12px; padding: 3px 9px; border-radius: 99px;
+    border: 1px solid var(--faint); background: var(--surface); color: var(--muted);
+  }
+  .pill b { color: var(--ink); font-weight: 600; }
+  .pill.ok { border-color: var(--accent); color: var(--accent); }
+  .pill.ok b { color: var(--accent); }
+  .pill.off { border-color: var(--faint); }
+
+  /* --- layout --- */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface); border: 1px solid var(--faint);
+    border-radius: 6px; padding: 18px; box-shadow: var(--shadow);
+  }
+  .card + .card { margin-top: 20px; }
+  h2 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); font-weight: 600; margin: 0 0 14px;
+  }
+  .field { margin-bottom: 16px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+
+  input[type=text] {
+    width: 100%; padding: 8px 10px; font: inherit;
+    font-family: "Courier New", monospace; font-size: 13px;
+    background: var(--sunk); color: var(--ink);
+    border: 1px solid var(--faint); border-radius: 4px;
+  }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row input { flex: 1; }
+
+  button {
+    font: inherit; cursor: pointer; border-radius: 4px;
+    border: 1px solid var(--faint); background: var(--surface); color: var(--ink);
+    padding: 8px 12px;
+  }
+  button:hover { border-color: var(--rule); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.primary {
+    width: 100%; padding: 12px; margin-top: 4px;
+    background: var(--ink); color: var(--ground); border-color: var(--ink);
+    font-weight: 600;
+  }
+  button.primary:hover { opacity: 0.88; }
+  .chips { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
+  .chips button { padding: 4px 9px; font-size: 12px; color: var(--muted); }
+
+  /* --- scenario picker --- */
+  .scenarios { display: flex; flex-direction: column; gap: 0; }
+  .scenario {
+    display: block; cursor: pointer; padding: 11px 12px;
+    border: 1px solid var(--faint); border-bottom: none;
+  }
+  .scenario:first-child { border-radius: 4px 4px 0 0; }
+  .scenario:last-child { border-bottom: 1px solid var(--faint); border-radius: 0 0 4px 4px; }
+  .scenario:hover { background: var(--sunk); }
+  .scenario input { position: absolute; opacity: 0; }
+  .scenario.on { background: var(--sunk); border-left: 2px solid var(--accent); padding-left: 11px; }
+  .scenario .name { font-weight: 600; display: flex; justify-content: space-between; gap: 10px; }
+  .scenario code { font-family: "Courier New", monospace; font-size: 11.5px; color: var(--muted); font-weight: 400; }
+  .scenario .why { color: var(--muted); font-size: 12.5px; margin-top: 3px; display: none; }
+  .scenario.on .why { display: block; }
+
+  /* --- budget --- */
+  .budget { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; }
+  .dot { width: 13px; height: 13px; border-radius: 50%; border: 1.5px solid var(--rule); }
+  .dot.spent { background: var(--rule); border-color: var(--rule); }
+  .dot.now { background: var(--accent); border-color: var(--accent); }
+  .budget .cap { font-size: 12px; color: var(--muted); margin-left: 4px; }
+
+  /* --- decision --- */
+  .verdict { font-family: Georgia, serif; font-size: 22px; margin: 0 0 4px; }
+  .verdict.retry { color: var(--accent); }
+  .verdict.escalate { color: var(--warn); }
+  .verdict.stop { color: var(--muted); }
+  .because { color: var(--muted); margin: 0 0 16px; }
+  dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 7px 16px; font-size: 13px; }
+  dt { color: var(--muted); }
+  dd { margin: 0; font-family: "Courier New", monospace; font-size: 12.5px; word-break: break-word; }
+  .note {
+    margin-top: 14px; padding: 10px 12px; background: var(--sunk);
+    border-left: 2px solid var(--rule); color: var(--muted); font-size: 12.5px;
+  }
+  .note.flag { border-left-color: var(--warn); }
+  .msg {
+    margin-top: 14px; padding: 12px; border: 1px solid var(--faint);
+    border-radius: 4px; background: var(--sunk);
+  }
+  .msg .who { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px; }
+  .msg p { margin: 0 0 8px; }
+  .msg a { color: var(--accent); word-break: break-all; }
+  .empty { color: var(--muted); font-style: italic; }
+
+  /* --- trace --- */
+  .trace { margin-top: 14px; font-family: "Courier New", monospace; font-size: 12px; color: var(--muted); }
+  .trace div { padding: 2px 0; }
+  .trace .tick { color: var(--accent); }
+
+  /* --- log --- */
+  .scroller { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; min-width: 640px; }
+  th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted); font-weight: 600; padding: 0 12px 7px 0; border-bottom: 1px solid var(--faint);
+  }
+  td { padding: 7px 12px 7px 0; border-bottom: 1px solid var(--faint); vertical-align: top; font-family: "Courier New", monospace; }
+  td.kind { font-family: inherit; }
+  tr:last-child td { border-bottom: none; }
+  .chain { display: flex; align-items: center; gap: 8px; }
+  .chain .badge { font-size: 12px; padding: 3px 9px; border-radius: 99px; border: 1px solid var(--accent); color: var(--accent); }
+  .chain .badge.bad { border-color: var(--warn); color: var(--warn); }
+  .chain .head { font-family: "Courier New", monospace; font-size: 11.5px; color: var(--muted); }
+
+  .disabled-banner {
+    border: 1px solid var(--warn); border-left-width: 3px; border-radius: 4px;
+    padding: 14px 16px; background: var(--surface); color: var(--ink); margin-bottom: 20px;
+  }
+  .disabled-banner code { background: var(--sunk); padding: 1px 5px; border-radius: 3px; font-family: "Courier New", monospace; }
+  footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--faint); color: var(--muted); font-size: 12.5px; }
+  footer code { font-family: "Courier New", monospace; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>fourshots <span>— decision console</span></h1>
+  <p class="sub">Every button here reaches the service the same way Razorpay does:
+  a signed <code>payment.failed</code> posted to <code>/webhooks/razorpay</code>. The page
+  holds no secret and decides nothing — it asks the server to sign one of a fixed
+  set of demo declines, then posts those exact bytes.</p>
+  <div class="pills" id="pills"></div>
+</header>
+
+<div id="banner"></div>
+
+<div class="cols">
+
+  <div>
+    <div class="card">
+      <h2>Send a decline</h2>
+
+      <div class="field">
+        <label for="mandate">Mandate</label>
+        <div class="row">
+          <input type="text" id="mandate" readonly>
+          <button id="fresh" title="Start a new mandate with a full budget">New</button>
+        </div>
+      </div>
+
+      <div class="budget" id="budget"></div>
+
+      <div class="field">
+        <label for="amount">Amount (₹)</label>
+        <input type="text" id="amount" value="2499">
+        <div class="chips">
+          <button data-amt="2499">₹2,499 — ordinary</button>
+          <button data-amt="18000">₹18,000 — above AFA</button>
+          <button data-amt="120000">₹1,20,000 — above elevated AFA</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Why it failed</label>
+        <div class="scenarios" id="scenarios"></div>
+      </div>
+
+      <button class="primary" id="send">Send payment.failed</button>
+      <div class="trace" id="trace"></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>What the engine did</h2>
+      <div id="decision"><p class="empty">Nothing sent yet.</p></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="card" style="margin-top:20px">
+  <h2>The decision log</h2>
+  <p class="sub" style="margin:-6px 0 12px">Actions only. The sequence numbers skip
+  because the observations that produced them are chained in between — every decline
+  is recorded before it is decided, so a redelivered webhook cannot spend a fifth attempt.</p>
+  <div class="chain" id="chain"></div>
+  <div class="scroller"><table id="log"><tbody></tbody></table></div>
+</div>
+
+<footer>
+  A booked retry is written into the schedule with its 24-hour pre-debit notice and
+  recorded as <code>executed_against_rail: false</code> — Razorpay exposes no call that
+  re-attempts a mandate on a chosen date. An escalation is genuinely executed: a Payment
+  Link raised against the <b>test-mode</b> API. Nothing on this page moves real money.
+</footer>
+
+</div>
+
+<script>
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+const MAX_ATTEMPTS = 4;
+
+// The offline defaults name themselves; both mean "no model in this path".
+const INERT = new Set(["none", "null", "template"]);
+
+// NPCI defines the AutoPay execution windows in IST -- 10:00-13:00 and
+// 17:00-21:30 are blocked -- so a scheduled time shown in any other zone is
+// unreadable against the rule it was chosen to satisfy.
+const IST = new Intl.DateTimeFormat("en-IN", {
+  timeZone: "Asia/Kolkata",
+  day: "2-digit", month: "short", year: "numeric",
+  hour: "2-digit", minute: "2-digit", hour12: false,
+});
+
+let scenarios = [];
+let chosen = null;
+let lastDecision = null;
+
+const money = (n) => "₹" + Number(n).toLocaleString("en-IN");
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+/* --- what this deployment can actually do ------------------------------- */
+
+async function loadStatus() {
+  // This file is also published as a static page, where there is no service
+  // behind it. Say so plainly rather than presenting a console whose every
+  // button silently fails.
+  let status;
+  try {
+    const response = await fetch("/console/status", { headers: { Accept: "application/json" } });
+    if (!response.ok && response.status !== 403) throw new Error("HTTP " + response.status);
+    status = await response.json();
+  } catch (err) {
+    $("banner").innerHTML =
+      '<div class="disabled-banner"><b>No service behind this page.</b><br>' +
+      "The console drives a running instance of fourshots. Start one with " +
+      "<code>uvicorn fourshots.app:app --port 8000</code> after setting " +
+      "<code>CONSOLE_ENABLED=true</code> in <code>.env</code>, then open " +
+      "<code>http://localhost:8000/console</code>.</div>";
+    $("send").disabled = true;
+    $("fresh").disabled = true;
+    return false;
+  }
+
+  if (!status.enabled) {
+    $("banner").innerHTML =
+      '<div class="disabled-banner"><b>The console is switched off.</b><br>' +
+      esc(status.reason) + "</div>";
+    $("send").disabled = true;
+    $("fresh").disabled = true;
+    return false;
+  }
+
+  const s = status.service;
+  const pill = (label, value, on) =>
+    '<span class="pill ' + (on ? "ok" : "off") + '">' + esc(label) +
+    " <b>" + esc(value) + "</b></span>";
+
+  // Each of these is capable of reading "off". A demo that hid an inactive
+  // model layer behind a friendly label would be the one thing this page
+  // exists to avoid.
+  $("pills").innerHTML =
+    pill("Payment links", s.executes_outward ? "test mode, live calls" : "not configured", s.executes_outward) +
+    pill("Decline triage", INERT.has(s.triager) ? "lookup table only" : s.triager, !INERT.has(s.triager)) +
+    pill("Escalation copy", s.drafter, !INERT.has(s.drafter)) +
+    pill("Language", s.language, false) +
+    pill("Merchant", s.merchant_name, false);
+
+  scenarios = status.scenarios;
+  renderScenarios();
+  return true;
+}
+
+function renderScenarios() {
+  $("scenarios").innerHTML = scenarios.map((sc, i) =>
+    '<label class="scenario' + (i === 0 ? " on" : "") + '" data-key="' + esc(sc.key) + '">' +
+      '<input type="radio" name="sc" value="' + esc(sc.key) + '"' + (i === 0 ? " checked" : "") + '>' +
+      '<span class="name">' + esc(sc.label) +
+        "<code>" + esc(sc.reason) + (sc.npci_code ? " + " + esc(sc.npci_code) : "") + "</code>" +
+      "</span>" +
+      '<span class="why">' + esc(sc.shows) + "</span>" +
+    "</label>").join("");
+
+  chosen = scenarios[0].key;
+  document.querySelectorAll(".scenario").forEach((el) => {
+    el.addEventListener("click", () => {
+      document.querySelectorAll(".scenario").forEach((o) => o.classList.remove("on"));
+      el.classList.add("on");
+      chosen = el.dataset.key;
+    });
+  });
+}
+
+/* --- the attempt budget ------------------------------------------------- */
+
+function renderBudget(used, highlight) {
+  let dots = "";
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    let cls = "dot";
+    if (i < used - (highlight ? 1 : 0)) cls += " spent";
+    else if (highlight && i === used - 1) cls += " now";
+    dots += '<span class="' + cls + '"></span>';
+  }
+  const left = Math.max(0, MAX_ATTEMPTS - used);
+  $("budget").innerHTML = dots +
+    '<span class="cap">' + used + " of " + MAX_ATTEMPTS + " spent this cycle · " +
+    left + " left</span>";
+}
+
+/* --- send --------------------------------------------------------------- */
+
+async function send() {
+  const btn = $("send");
+  btn.disabled = true;
+  $("trace").innerHTML = "";
+
+  const step = (text, ok) =>
+    ($("trace").innerHTML += '<div><span class="tick">' + (ok ? "✓" : "·") + "</span> " + esc(text) + "</div>");
+
+  try {
+    const signed = await fetch("/console/sign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mandate_id: $("mandate").value,
+        scenario: chosen,
+        amount: $("amount").value.trim(),
+      }),
+    });
+    const envelope = await signed.json();
+    if (!signed.ok) {
+      $("decision").innerHTML = '<p class="empty">' + esc(envelope.error || "rejected") + "</p>";
+      return;
+    }
+    step("server signed the payload — HMAC-SHA256, secret never left it", true);
+
+    // Post the exact bytes that were signed. Re-encoding a parsed object here
+    // would be free to reorder keys, and the signature commits to bytes.
+    const posted = await fetch("/webhooks/razorpay", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", [envelope.header]: envelope.signature },
+      body: envelope.body,
+    });
+    const result = await posted.json();
+    step("posted to /webhooks/razorpay → " + posted.status +
+         (result.accepted ? " · signature verified" : " · rejected"), posted.ok);
+
+    if (!result.decision) {
+      $("decision").innerHTML = '<p class="empty">' + esc(JSON.stringify(result)) + "</p>";
+      return;
+    }
+    step("decision recorded and hash-chained", true);
+    lastDecision = result.decision;
+    renderDecision(result);
+    renderBudget(result.decision.attempts_used, true);
+    await refreshLog();
+  } catch (err) {
+    $("decision").innerHTML = '<p class="empty">' + esc(err.message) + "</p>";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+const VERDICTS = {
+  retry_booked: ["retry", "Retry booked"],
+  escalated: ["escalate", "Escalated to the customer"],
+  stopped: ["stop", "Stopped"],
+  rejected: ["stop", "Attempt refused by the legality gate"],
+};
+
+function renderDecision(result) {
+  const d = result.decision;
+  const [cls, title] = VERDICTS[d.action] || ["stop", d.action];
+
+  let html = '<p class="verdict ' + cls + '">' + esc(title) + "</p>";
+  html += '<p class="because">Read as <b>' + esc(d.failure_class) +
+          "</b> — blocker: " + esc(d.blocker) + ".</p>";
+
+  html += "<dl>";
+  html += "<dt>Attempts</dt><dd>" + d.attempts_used + " used · " + d.attempts_remaining + " left</dd>";
+  if (d.execute_at) {
+    html += "<dt>Execute at</dt><dd>" +
+            esc(IST.format(new Date(d.execute_at))) + " IST</dd>";
+  }
+  if (d.violations && d.violations.length) {
+    html += "<dt>Violations</dt><dd>" + esc(d.violations.join(", ")) + "</dd>";
+  }
+  if (d.payment_link_url) {
+    html += '<dt>Payment link</dt><dd><a href="' + esc(d.payment_link_url) +
+            '" target="_blank" rel="noopener">' + esc(d.payment_link_id || "open") + "</a></dd>";
+  }
+  html += "<dt>Executed</dt><dd>" + (d.executed ? "yes" : "no") + "</dd>";
+  html += "</dl>";
+
+  if (d.action === "retry_booked") {
+    html += '<div class="note flag">Booked and notified, <b>not fired at the rail</b>. ' +
+            "Razorpay has no call that re-attempts a mandate on a chosen date, so the " +
+            "audit entry records <code>executed_against_rail: false</code> rather than " +
+            "letting a reader assume otherwise.</div>";
+  }
+  // The flag above already states the boundary in full; repeating the log's
+  // terser version of the same sentence underneath just reads as a stutter.
+  if (d.note && !(d.action === "retry_booked" && d.note.includes("not submitted to the rail"))) {
+    html += '<div class="note">' + esc(d.note) + "</div>";
+  }
+
+  if (d.message) {
+    html += '<div class="msg"><div class="who">Message to the customer · ' +
+            esc(d.message_source) + " · " + esc(d.message_language) +
+            (d.executed ? "" : " · drafted, not sent") + "</div>";
+    html += "<p>" + esc(d.message) + "</p>";
+    if (d.payment_link_url) {
+      html += '<a href="' + esc(d.payment_link_url) + '" target="_blank" rel="noopener">' +
+              esc(d.payment_link_url) + "</a>";
+    }
+    html += "</div>";
+  }
+
+  $("decision").innerHTML = html;
+}
+
+/* --- the log ------------------------------------------------------------ */
+
+const SHORT = {
+  attempt_booked: "retry booked",
+  attempt_rejected: "attempt refused",
+  escalation_executed: "escalation sent",
+  escalation_drafted: "escalation drafted",
+  mandate_halted: "mandate halted",
+};
+
+async function refreshLog() {
+  const [actions, chain] = await Promise.all([
+    fetch("/recovery/actions").then((r) => r.json()),
+    fetch("/audit/verify").then((r) => r.json()),
+  ]);
+
+  $("chain").innerHTML =
+    '<span class="badge' + (chain.verified ? "" : " bad") + '">' +
+    (chain.verified ? "chain verified · " + chain.entries + " entries" : "chain broken at " + chain.broken_at_seq) +
+    "</span>" +
+    '<span class="head">head ' + esc(String(chain.head || "").slice(0, 16)) + "…</span>";
+
+  const rows = actions.actions.slice(-12).reverse();
+  const body = rows.map((a) =>
+    "<tr>" +
+      "<td>" + a.seq + "</td>" +
+      "<td>" + esc(IST.format(new Date(a.at)).split(", ").pop()) + "</td>" +
+      '<td class="kind">' + esc(SHORT[a.kind] || a.kind) + "</td>" +
+      "<td>" + esc(a.mandate_id || "") + "</td>" +
+      "<td>" + esc(a.failure_class || a.reason || "") + "</td>" +
+    "</tr>").join("");
+
+  $("log").innerHTML =
+    "<thead><tr><th>chain #</th><th>time (IST)</th><th>action</th><th>mandate</th>" +
+    "<th>read as</th></tr></thead>" +
+    "<tbody>" + (body || '<tr><td colspan="5" class="empty">No actions yet.</td></tr>') + "</tbody>";
+}
+
+/* --- wiring ------------------------------------------------------------- */
+
+async function freshMandate() {
+  const r = await fetch("/console/new-mandate", { method: "POST" });
+  const j = await r.json();
+  if (j.mandate_id) {
+    $("mandate").value = j.mandate_id;
+    renderBudget(0, false);
+    $("decision").innerHTML = '<p class="empty">New mandate — full budget of four.</p>';
+    $("trace").innerHTML = "";
+  }
+}
+
+document.querySelectorAll(".chips button").forEach((b) => {
+  b.addEventListener("click", () => { $("amount").value = b.dataset.amt; });
+});
+$("send").addEventListener("click", send);
+$("fresh").addEventListener("click", freshMandate);
+
+(async function start() {
+  renderBudget(0, false);
+  if (await loadStatus()) {
+    await freshMandate();
+    await refreshLog();
+  }
+})();
+</script>
+</body>
+</html>

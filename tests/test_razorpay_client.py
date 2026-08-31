@@ -225,3 +225,48 @@ def test_an_http_error_is_turned_into_a_razorpay_error(monkeypatch) -> None:
         client.create_payment_link(amount=Decimal("0.10"), description="d")
     assert raised.value.status == 400
     assert "amount too small" in raised.value.body
+
+
+# --- reference ids ----------------------------------------------------------
+
+
+def test_a_reference_never_exceeds_the_api_limit():
+    """Found by driving the console against the live test-mode API.
+
+    The obvious construction -- mandate id and payment id joined with a colon --
+    is 37 characters for real Razorpay ids and over the limit for anything
+    longer, so every escalation failed with a 400 after the decision had already
+    been made.
+    """
+    from fourshots.razorpay_client import REFERENCE_ID_MAX, idempotency_reference
+
+    for parts in [
+        ("sub_MNq8vLPk2xYzAb", "pay_MNq8vLPk2xYzAb"),
+        ("sub_demo_fa9f574b940e", "pay_demo_9c1e77a04b62"),
+        ("s", "p"),
+        ("x" * 200, "y" * 200),
+    ]:
+        assert len(idempotency_reference(*parts)) <= REFERENCE_ID_MAX
+
+
+def test_a_reference_is_stable_for_the_same_event():
+    """Idempotency is the whole point: the same failed cycle, the same id."""
+    from fourshots.razorpay_client import idempotency_reference
+
+    first = idempotency_reference("sub_abc", "pay_xyz")
+    assert first == idempotency_reference("sub_abc", "pay_xyz")
+    assert first != idempotency_reference("sub_abc", "pay_other")
+    assert first != idempotency_reference("sub_other", "pay_xyz")
+
+
+def test_an_over_long_reference_fails_locally_rather_than_at_the_api():
+    """The limit is Razorpay's, so this client is where it should be caught."""
+    from fourshots.razorpay_client import RazorpayClient
+
+    client = RazorpayClient("rzp_test_abc", "secret")
+    with pytest.raises(ValueError, match="reference_id"):
+        client.create_payment_link(
+            amount=Decimal("100"),
+            description="test",
+            reference_id="x" * 41,
+        )
